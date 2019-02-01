@@ -8,12 +8,10 @@ const Logger = require('./../util/logger');
 
 /**
  * Generic Server with Client and Room management.
- * Requires an ServerListener that listens on some protocol
+ * Requires a ServerListener that listens on some protocol
  * for connections and disconnection. On each connection,
  * the ServerListener should emit a "connect" event, along
- * with the appropriate ClientSocket and any additional 
- * connection data. Server will then create a Client and 
- * provide it with the ClientSocket.
+ * with the appropriate Client.
  * @extends {EventEmitter}
  */
 class Server extends EventEmitter {
