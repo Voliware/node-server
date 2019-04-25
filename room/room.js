@@ -1,9 +1,10 @@
 const ClientManager = require('./../client/clientManager');
-const ServerMessage = require ('./../server/serverMessage');
+const Message = require ('../message/message');
 
 /**
- * Generic room for holding clients and broadcasting
- * messages to all of them.
+ * A client manager with some extra functionality.
+ * Adds the ability to privatize the room,
+ * assign ownership
  * @extends {ClientManager}
  */
 class Room extends ClientManager {
@@ -30,17 +31,11 @@ class Room extends ClientManager {
 
 		// used for generating unique message ids
 		this.lastMessageTime = 0;
-		this.lastMessageTimeCounter = 0;
-		return this;
-    }
+        this.lastMessageTimeCounter = 0;
+        
+        this.router = new Map();
 
-    /**
-     * Determine if a client has been banned
-     * @param {number|string} clientId 
-     * @return {boolean}
-     */
-    isClientBanned(clientId){
-        return this.bannedList.indexOf(clientId) > -1;
+		return this;
     }
 
 	/**
@@ -80,7 +75,7 @@ class Room extends ClientManager {
 	join(client, password = ""){
 		if(!this.isClientBanned(client.id) && this.checkPassword(password)){
 			this.addClient(client.id, client);
-			this.broadcastJson
+			// this.broadcast();
             return true;
 		}
 		return false;
@@ -116,47 +111,6 @@ class Room extends ClientManager {
 	}
 
 	/**
-	 * Broadcast msg to all clients
-	 * @param {object} msg
-	 * @param {object} msg.data
-	 * @return {Room}
-	 */
-	broadcast(msg){
-		msg.data.room = this.name;
-		return super.broadcast(msg);
-	}
-
-	/**
-	 * Broadcast JSON msg to all clients
-	 * @param {object} msg 
-	 * @param {object} [msg.data]
-	 * @return {Room}
-	 */
-	broadcastJson(msg){
-        if(typeof msg.data === 'undefined'){
-            msg.data = {};
-        }
-		msg.data.room = this.name;
-		return super.broadcastJson(msg);
-	}
-	
-	/**
-	 * Serialize clients into an array
-	 * @return {Client[]}
-	 */
-	serializeClients(){
-		let clients = [];
-		for(let k in this.clients){
-			let client = this.clients[k];
-			clients.push({
-				id: client.id,
-				name: client.name
-			});
-		}
-		return clients;
-	}
-
-	/**
 	 * Convert the room into an object
 	 * @return {null|object}
 	 */
@@ -180,8 +134,8 @@ class Room extends ClientManager {
     attachClientHandlers(client){
         super.attachClientHandlers(client);
         let self = this;
-        client.on('data', function(data){
-            self.routeMessage(client, data);
+        client.on('message', function(message){
+            self.routeMessage(message, client);
         });
         // leaving this here for knowledge:
         // if you create clients and add them to a room,
@@ -203,17 +157,17 @@ class Room extends ClientManager {
      */
     addClient(id, client){
         super.addObject(id, client);
-        client.writeJson({
-            cmd: Room.cmd.info,
-            data: this.serialize()
-		});
-		this.broadcastJson({
-			cmd: Room.cmd.client.add,
-			data: {
-				id: id,
-				name: client.name
-			}
-		});
+        // client.writeJson({
+        //     route: Room.cmd.info,
+        //     data: this.serialize()
+		// });
+		// this.broadcastJson({
+		// 	route: Room.cmd.client.add,
+		// 	data: {
+		// 		id: id,
+		// 		name: client.name
+		// 	}
+		// });
         return this;
 	}
 	
@@ -225,211 +179,148 @@ class Room extends ClientManager {
      */
 	deleteClient(id){
 		super.deleteClient(id);
-		this.broadcastJson({
-			cmd: Room.cmd.client.delete,
-			data: {
-				id: id
-			}
-		});
+		// this.broadcastJson({
+		// 	route: Room.cmd.client.delete,
+		// 	data: {
+		// 		id: id
+		// 	}
+		// });
 	}
 
-    ////////////////////////////////////////
-    // Messaging
-	////////////////////////////////////////
-	
-	/**
-	 * Generate a unique message id based on
-	 * the time and a client id
-	 * @param {string} clientId 
-	 * @param {number} time 
-	 * @return {string}
-	 */
-	generateMessageId(clientId, time){
-		if(time === this.lastMessageTime){
-			time += "_" + this.lastMessageTimeCounter++;
-		}
-		else {
-			this.lastMessageTimeCounter = 0;
-		}
-		this.lastMessageTime = time;
-		return clientId + time;
-	}
+    /////////////////////////////////////
+    // Messages
+	/////////////////////////////////////
 
-    ////////////////////////////////////////
-    // Request Handlers
-	////////////////////////////////////////
+    /**
+     * Add the default routes to the router map.
+     * @return {Server}
+     */
+	addDefaultRoutes(){
+		this.router.set("/broadcast", this.handleMessageBroadcast.bind(this));
+		this.router.set("/deprivatize", this.handleMessageDeprivatize.bind(this));
+		this.router.set("/lock", this.handleMessageLock.bind(this));
+		this.router.set("/privatize", this.handleMessagePrivatize.bind(this));
+		this.router.set("/unlock", this.handleMessageUnlock.bind(this));
+		return this;
+	}
 
 	/**
      * Handle a request to broadcast a message to a room.
      * If successful, will broadcast to everyone including the client.
-	 * Return a ServerMessage with ok or err.
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {string} message.text
      * @param {Client} client
-	 * @param {object} data
-	 * @param {string} data.text
-	 * @return {ServerMessage}
+	 * @return {Message}
 	 */
-	handleRequestBroadcast(client, data){
+	handleMessageBroadcast(message, client){
 		let time = Date.now();
-        let msg = new ServerMessage({
-            cmd: Room.cmd.client.broadcast,
-            data:{
-                text: data.text,
+        let msg = new Message({
+            route: "/broadcast",
+            data: {
+                text: message.text,
                 user: client.name,
 				time: time,
 				id: this.generateMessageId(client.id, time)
             }
         });
-        this.broadcastJson(msg.serialize());
-		return msg;
-	}
-    
-	/**
-     * Handle a request to privatize the room.
-	 * Return a ServerMessage with ok or err.
-	 * @param {Client} client
-	 * @return {ServerMessage}
-	 */
-	handleRequestPrivatize(client){
-        let msg = new ServerMessage({cmd: Room.cmd.privatize});
-        if(this.isOwner(client.id)){
-			this.privatize();
-        }
-		else{
-            msg.setError("You are not the father");
-		}
+        // this.broadcastJson(msg.serialize());
 		return msg;
 	}
     
 	/**
      * Handle a request to deprivatize the room.
-	 * Return a ServerMessage with ok or err.
+	 * Return a Message with ok or err.
+	 * @param {Message} message
 	 * @param {Client} client
-	 * @return {ServerMessage}
+	 * @return {Message}
 	 */
-	handleRequestDeprivatize(client){
-        let msg = new ServerMessage({cmd: Room.cmd.deprivatize});
+	handleMessageDeprivatize(message, client){
+        let msg = new Message({route: "/deprivatize"});
         if(this.isOwner(client.id)){
 			this.deprivatize();
         }
 		else{
-            msg.setError("You are not the father");
+            msg.setError("You do not own this room");
 		}
 		return msg;
 	}
     
 	/**
      * Handle a request to lock a room.
-	 * Return a ServerMessage with ok or err.
+	 * Return a Message with ok or err.
+     * @param {Message} message
+	 * @param {string} message.password
 	 * @param {Client} client
-     * @param {object} data
-	 * @param {string} data.password
-	 * @return {ServerMessage}
+	 * @return {Message}
 	 */
-	handleRequestLock(client, data){
-        let msg = new ServerMessage({cmd: Room.cmd.lock});
+	handleMessageLock(message, client){
+        let msg = new Message({route: "/lock"});
         if(this.isOwner(client.id)){
-			this.lock(data.password);
+			this.lock(message.password);
         }
 		else{
-            msg.setError("You are not the father");
+            msg.setError("You do not own this room");
+		}
+		return msg;
+	}
+    
+	/**
+     * Handle a request to privatize the room.
+	 * Return a Message with ok or err.
+     * @param {Message} message
+	 * @param {Client} client
+	 * @return {Message}
+	 */
+	handleMessagePrivatize(message, client){
+        let msg = new Message({route: "/privatize"});
+        if(this.isOwner(client.id)){
+			this.privatize();
+        }
+		else{
+            msg.setError("You do not own this room");
 		}
 		return msg;
 	}
     
 	/**
      * Handle a request to unlock a room.
-	 * Return a ServerMessage with ok or err.
+	 * Return a Message with ok or err.
+	 * @param {Message} message
 	 * @param {Client} client
-	 * @return {ServerMessage}
+	 * @return {Message}
 	 */
-	handleRequestUnlock(client){
-        let msg = new ServerMessage({cmd: Room.cmd.unlock});
+	handleMessageUnlock(message, client){
+        let msg = new Message({route: "/unlock"});
         if(this.isOwner(client.id)){
 			this.unlock();
         }
 		else{
-            msg.setError("You are not the father");
+            msg.setError("You do not own this room");
 		}
 		return msg;
     }
-    
-    /**
-	 * Route a message sent to the room from a client.
-     * @param {Client} client
-	 * @param {object} data
-	 * @return {Room}
+
+	/**
+	 * Received command router
+	 * @param {Message} message
+	 * @param {Client} client
+	 * @return {Server}
 	 */
-    routeMessage(client, data){
-        this.logger.debug(`Routing cmd ${data.cmd}`);
-        
-        let response = null;
-        switch(data.cmd){
-            case Room.cmd.client.add:
-                response = this.handleRequestAddClient(data);
-                break;
-            case Room.cmd.client.delete:
-                response = this.handleRequestDeleteClient(data);
-                break;
-            case Room.cmd.client.deleteAll:
-                response = this.handleRequestDeleteClients(data);
-                break;
-            case Room.cmd.client.get:
-                response = this.handleRequestGetClient(data);
-                break;
-            case Room.cmd.client.getAll:
-                response = this.handleRequestGetClients(data);
-                break;
-            case Room.cmd.client.kick:
-                response = this.handleRequestKickClient(data);
-                break;
-            case Room.cmd.client.ban:
-                response = this.handleRequestBanClient(data);
-                break;
-            case Room.cmd.client.broadcast:
-                // this will send a response to the client already
-                this.handleRequestBroadcast(client, data);
-                break;
-            case Room.cmd.privatize:
-                response = this.handleRequestPrivatize(data);
-                break;
-            case Room.cmd.deprivatize:
-                response = this.handleRequestDeprivatize(data);
-                break;
-            case Room.cmd.lock:
-                response = this.handleRequestLock(data);
-                break;
-            case Room.cmd.unlock:
-                response = this.handleRequestUnlock(data);
-                break;
-            default:
-                this.logger.info(`Cmd ${data.cmd} not found`);
-                response = new ServerMessage({
-                    status: ServerMessage.status.error
-                });
-                break;
+	routeMessage(message, client){
+        if(message.isDone()){
+            return this;
         }
-        if(response){
-            client.writeJson(response.serialize());
+		let responseMessage = null;
+		let route = this.router.get(message.route);
+		if(route){
+			responseMessage = route(message, client);
+		}
+		if(responseMessage){
+			client.writeMessage(responseMessage);
         }
 		return this;
-    }
-    
+	}
 }
-Room.cmd = {
-    client: {
-        add: 100,
-        delete: 101,
-        deleteAll: 102,
-        get: 103,
-        getAll: 104,
-        kick: 105,
-        ban: 106,
-        broadcast: 107
-    },
-    privatize: 108,
-    deprivatize: 109,
-    lock: 110,
-	unlock: 111,
-	info: 112
-};
+
 module.exports = Room;

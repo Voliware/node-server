@@ -63,34 +63,17 @@ class WebSocketClient extends Client {
                 self.ping();
             }, 1000);
         })
-        // always try and parse a message into json
-        // if it is not json, it must be a ping or pong
-        // otherwise we do not support it
+        
+        // on message, deserialize into message object
 		socket.on('message', function(data){
             self.logger.debug('Received message:');
-			self.logger.debug(data);
-			try{
-				let json = JSON.parse(data);
-                self.emit('data', json);
-			}
-			catch(e) {
-                if(data === "ping"){
-					self.logger.info('Websocket ping');
-					self.emit('ping');
-                    self.pong();
-                }
-                else if(data === "pong"){
-                    self.logger.info('Websocket pong');
-					self.emit('pong');
-                    self.recordLatency();
-                }
-                else {
-                    self.logger.warn('Data is not json or ping');
-                    self.logger.error(e);
-					self.emit('error', e);
-                }
-			}
+            self.logger.debug(data);
+            
+            let message = self.createMessage();
+            message.deserialize(data);
+            self.routeMessage(message);
         });
+
         // on error, increase the max error count
         // if max error is hit, emit maxError event
 		socket.on('error', function(error){
@@ -102,6 +85,7 @@ class WebSocketClient extends Client {
 				self.emit('maxError');
 			}
         });
+
         // on close, emit disconnect
 		socket.on('close', function(code, reason){
             self.logger.debug(`Websocket closed with code: ${code}, reason: ${reason ? reason : "none"}`);
@@ -109,6 +93,15 @@ class WebSocketClient extends Client {
 		});
 		return this;
 	}
+
+    /**
+     * Disconnect the client.
+     * @return {WebSocketClient}
+     */
+    disconnect(){
+		this.socket.close(0, "");
+		return this;
+    }
 
 	/**
 	 * Write data to the socket.
@@ -126,23 +119,6 @@ class WebSocketClient extends Client {
             return null;
         }
 	}
-
-    /**
-     * Ping the web socket
-	 * @return {*|Number}
-     */
-    ping(){
-        this.updateLastPingSent();
-        return this.write("ping");
-    }
-
-    /**
-     * Pong the web socket
-	 * @return {*|Number}
-     */
-    pong(){
-        return this.write("pong");
-    }
 }
 
 module.exports = WebSocketClient;

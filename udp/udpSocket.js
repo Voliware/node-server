@@ -51,6 +51,10 @@ class UdpSocket extends EventEmitter {
         return this;
     }
 
+    /**
+     * Close the socket
+     * @return {UdpSocket}
+     */
     close(){
         this.socket.close();
         return this;        

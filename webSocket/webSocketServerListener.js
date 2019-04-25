@@ -1,7 +1,6 @@
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-const express = require('express');
 const ServerListener = require('../server/serverListener');
 const WebSocketServer = require('ws').Server;
 const WebSocketClient = require('./webSocketClient');
@@ -38,9 +37,6 @@ class WebSocketServerListener extends ServerListener {
 		};
 		super(Object.extend(defaults, options));
 
-		// we need an http or https server for our websocket server
-		this.expressApp = express();
-
 		// properties
 		this.https = defaults.https;
 		this.certificate = null;
@@ -63,19 +59,30 @@ class WebSocketServerListener extends ServerListener {
 	 * Start an HTTP/S server and a WebSocket server.
 	 * Begin listening on the WebSocket server.
 	 * @param {object} [options]
+	 * @return {WebSocketServerListener}
 	 */
 	listen(options){
 		if(this.https === true){
-			this.server = this.createHttpsServer(this.expressApp);
+			this.server = this.createHttpsServer(null);
 		}
 		else {
-			this.server = this.createHttpServer(this.expressApp);
+			this.server = this.createHttpServer(null);
 		}
 		this.webSocketServer = this.createWebSocketServer(this.server);
 
 		this.attachHttpServerHandlers();
 		this.attachWebSocketServerHandlers();
 		this.logger.info(`Listening on ${this.host} port ${this.port}`);
+		return this;
+	}
+
+	/**
+	 * Close the server listener.
+	 * @return {WebSocketServerListener}
+	 */
+	close(){
+		this.webSocketServer.close();
+		return this;
 	}
 
 	/**

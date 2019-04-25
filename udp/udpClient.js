@@ -18,13 +18,6 @@ class UdpClient extends Client {
 	constructor(socket, options={}){
         let defaults = {logHandle: "UdpClient"};
         super(socket, Object.extend(defaults, options));
-
-		// buffer
-		// this.bufferSize = 1024;
-		// this.buffer = Buffer.alloc(this.bufferSize);
-		// // <EOF>
-		// this.bufferEnd = Buffer.from([0x3c, 0x45, 0x4f, 0x46, 0x3e]);
-
 		return this;
 	}
 
@@ -57,39 +50,8 @@ class UdpClient extends Client {
 	 */
 	attachSocketHandlers(socket){		
 		let self = this;
-		// build up buffer
-		// this.socket.on('data', function(data){
-		// 	let dataBuffer = Buffer.from(data);
-		// 	self._concatBuffer(dataBuffer);
-		// 	if(self._isEndOfData()){
-		// 		self._emitDataReady();
-		// 	}
-		// });
 		socket.on('data', function(data){
-			
-
-			try{
-				let json = JSON.parse(data);
-				self.emit('data', json);
-			}
-			catch(e) {
-				let msg = data.toString('utf8');
-                if(msg === "ping"){
-					self.logger.info('UdpClient ping');
-					self.emit('ping');
-                    self.pong();
-                }
-                else if(msg === "pong"){
-                    self.logger.info('UdpClient pong');
-					self.emit('pong');
-                    self.recordLatency();
-                }
-                else {
-                    self.logger.warn('Data is not json or ping');
-                    self.logger.error(e);
-					self.emit('error', e);
-                }
-			}
+			self.processRxData(data);
 		});
 		socket.on('error', function(){
 			self.logger.error("Socket error:");
@@ -121,12 +83,16 @@ class UdpClient extends Client {
 	 * @return {*|Number|null} - returns null if it failed
 	 */
 	write(data){
-		// convert objs to JSON
-		// append <EOF> to every msg
-		data = isString(data) ? data : JSON.stringify(data);
-		data += "<EOF>";
-		let msg = Buffer.from(data);
-		return this.socket.write(msg);
+		return this.socket.write(data);
+	}
+
+	/**
+	 * Disconnect the client.
+	 * Does nothing for UDP.
+	 * @return {UdpClient}
+	 */
+	disconnect(){
+		return this;
 	}
 
     /**
@@ -141,56 +107,6 @@ class UdpClient extends Client {
 		}
 		return this;
 	}
-
-    /**
-     * Ping the web socket
-	 * @return {*|Number}
-     */
-    ping(){
-        this.updateLastPingSent();
-        return this.write("ping");
-    }
-
-    /**
-     * Pong the web socket
-	 * @return {*|Number}
-     */
-    pong(){
-        return this.write("pong");
-    }
-
-	// /**
-	//  * Concat a buffer to the local buffer
-	//  * if there is enough space.
-	//  * @param {Buffer} dataBuffer
-	//  * @private
-	//  */
-	// _concatBuffer(dataBuffer){
-	// 	if(this.buffer.length + dataBuffer.length < this.bufferSize){
-	// 		this.buffer.concat(dataBuffer);
-	// 	}
-	// }
-	//
-	// /**
-	//  * Check if the buffer has an end
-	//  * of data identifier within it
-	//  * @param {Buffer} buffer
-	//  * @private
-	//  */
-	// _isEndOfData(buffer){
-	// 	return buffer.includes(this.bufferEnd);
-	// }
-	//
-	// /**
-	//  * Emit the ready buffer data as JSON
-	//  * @return {Client}
-	//  * @private
-	//  */
-	// _emitDataReady(){
-	// 	let data = JSON.parse(this.buffer);
-	// 	this.emit('dataReady', data);
-	// 	return this;
-	// }
 
 	/**
 	 * Convert to object

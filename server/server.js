@@ -1,5 +1,5 @@
 const EventEmitter = require('events').EventEmitter;
-const ServerMessage = require ('./serverMessage');
+const Message = require ('../message/message');
 const ServerListener = require ('./serverListener');
 const Client = require('./../client/client');
 const ClientManager = require('./../client/clientManager');
@@ -9,9 +9,9 @@ const Logger = require('./../util/logger');
 /**
  * Generic Server with Client and Room management.
  * Requires a ServerListener that listens on some protocol
- * for connections and disconnection. On each connection,
- * the ServerListener should emit a "connect" event, along
- * with the appropriate Client.
+ * for connections and disconnections.
+ * The Server handles a lot of basic server requests, 
+ * like retrieving clients and managing rooms.
  * @extends {EventEmitter}
  */
 class Server extends EventEmitter {
@@ -22,33 +22,60 @@ class Server extends EventEmitter {
 	 * @param {ServerListener} options.serverListener
 	 * @param {string} [options.name="server"]
 	 * @param {string} [options.logHandle]
-	 * @param {string} [options.clientManagerOptions]
-	 * @param {string} [options.roomManagerOptions]
+	 * @param {function} [options.router]
+	 * @param {object} [options.clientManagerOptions={}]
+	 * @param {object} [options.roomManagerOptions={}]
+	 * @param {object} [options.message={}] - message options for the Client
+	 * @param {function} [options.message.constructor=Message] - the Message type (constructor)
+	 * @param {string} [options.message.type="buffer"] - the type of data the client receives
+     * @param {string} [options.message.encoding="utf8"] - rx/tx buffer encoding
+	 * @param {string} [options.message.eof="\r"] - rx/tx buffer end of datagram character
 	 * @return {Server}
 	 */
 	constructor(options){
 		super();
 
 		// properties
-		this._serverListener = options.serverListener || null;
+		this.serverListener = options.serverListener || null;
 		this.name = options.name || "Server";
 		this.port;
 		this.host;
 
+		this.clientManagerOptions = options.clientManagerOptions || {};
+		this.roomManagerOptions = options.roomManagerOptions || {};
+
         // components
         this.logger = new Logger(options.logHandle || this.name, this);
-		this.clientManager = this.createClientManager(options.clientManagerOptions);
-		this.roomManager = this.createRoomManager(options.roomManagerOptions);
+		this.clientManager = this.createClientManager(this.clientManagerOptions);
+		this.roomManager = this.createRoomManager(this.roomManagerOptions);
+		this.router = options.router || new Map();
 
 		// set the log handle of each component to the same name of the server
-		this._serverListener.logger.setLogHandle(this.logger.name, this._serverListener);
-		this.clientManager.logger.setLogHandle(this.logger.name, this.clientManager);
-		this.roomManager.logger.setLogHandle(this.logger.name, this.roomManager);
+		this._serverListener.logger.setLogHandle(this.name, this._serverListener);
+		this.clientManager.logger.setLogHandle(this.name, this.clientManager);
+		this.roomManager.logger.setLogHandle(this.name, this.roomManager);
+
+		// messaging
+		if(!options.message){
+			options.message = {};
+		}
+		// these options will be passed to Clients
+		// they are not used at all on the server level
+		this.messageOptions = {
+			constructor: options.message.constructor || Message,
+			// these would only apply to UDP/TCP clients
+			type: options.message.type || "buffer",
+			eof: options.message.eof || "\r",
+			encoding: options.message.encoding || 'utf8'
+		};
 
 		// handlers
 		this.attachServerListenerHandlers(this._serverListener);
 		this.attachClientManagerHandlers(this.clientManager);
 		this.attachRoomManagerHandlers(this.roomManager);
+
+		// init
+		this.addDefaultRoutes();
 		return this;
 	}
 
@@ -82,6 +109,7 @@ class Server extends EventEmitter {
 
 	/**
 	 * Get the port
+	 * @return {number} 
 	 */
 	get port(){
 		return this.serverListener.port;
@@ -89,6 +117,7 @@ class Server extends EventEmitter {
 
 	/**
 	 * Get the host
+	 * @return {string} 
 	 */
 	get host(){
 		return this.serverListener.host;
@@ -100,6 +129,17 @@ class Server extends EventEmitter {
 	 */
 	start(){
 		this.serverListener.listen();
+		return this;
+	}
+
+	/**
+	 * Shut down the server listener
+	 * @return {Server}
+	 */
+	stop(){
+		this.clientManager.disconnectClients();
+		this.clientManager.empty();
+		this.serverListener.close();
 		return this;
 	}
 
@@ -128,6 +168,7 @@ class Server extends EventEmitter {
 			throw new Error("client must be an instanceof Client");
 		}
 
+		client.setMessageOptions(this.messageOptions);
 		this.attachClientHandlers(client);
 		this.clientManager.addClient(client.id, client);
 		client.ping();
@@ -141,8 +182,8 @@ class Server extends EventEmitter {
      */
     attachClientHandlers(client){
 		let self = this;
-		client.on('data', function(data){
-			self.routeMessage(client, data);
+		client.on('message', function(message){
+			self.routeMessage(message, client);
 		});
 		client.on('error', function(error){
 			self.logger.error("Client error:");
@@ -188,144 +229,100 @@ class Server extends EventEmitter {
 	}	
 
     /////////////////////////////////////
-    // Room Commands and Messages
-    /////////////////////////////////////
+    // Messages
+	/////////////////////////////////////
 
-	/**
-     * Handle a request to get all rooms.
-	 * Return a ServerMessage with all rooms.
-	 * @param {object} data
-	 * @param {number} data.index
-	 * @param {number} data.max
-	 * @return {ServerMessage}
-	 */
-	handleRequestRoomGetAll(data){
-		let rooms = this.roomManager.serialize(data.index, data.max);
-		return new ServerMessage({
-			cmd: Server.cmd.room.getAll,
-			data: {rooms: rooms}
-		});
+    /**
+     * Add the default routes to the router map.
+     * @return {Server}
+     */
+	addDefaultRoutes(){
+		this.router.set("/client/whisper", this.handleMessageClientWhisper.bind(this));
+		this.router.set("/room/add", this.handleMessageRoomAdd.bind(this));
+		this.router.set("/room/delete", this.handleMessageRoomDelete.bind(this));
+		this.router.set("/room/empty", this.handleMessageRoomEmpty.bind(this));
+		this.router.set("/room/get", this.handleMessageRoomGet.bind(this));
+		this.router.set("/room/join", this.handleMessageRoomJoin.bind(this));
+		this.router.set("/room/leave", this.handleMessageRoomLeave.bind(this));
+		this.router.set("/room/client/ban", this.handleMessageRoomBanClient.bind(this));
+		this.router.set("/room/client/get", this.handleMessageRoomGetClients.bind(this));
+		this.router.set("/room/client/kick", this.handleMessageRoomKickClient.bind(this));
+		return this;
 	}
 
 	/**
-     * Handle a request to get a room.
-	 * Return a ServerMessage with the room.
-	 * @param {object} data
-	 * @param {string} data.room
-	 * @return {ServerMessage}
+     * Handle a request to whisper directly to another client.
+     * Send the msg to the other client, if found.
+	 * Return a Message with the whispered msg or error.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.clientId
+	 * @param {string} message.data.msg
+	 * @param {Client} client
+	 * @return {Message}
 	 */
-	handleRequestRoomGet(data){
-        let msg = new ServerMessage({cmd: Server.cmd.room.get});
-		let room = this.roomManager.getRoom(data.room);
-		if(!room){
-            msg.setError("Invalid room");
+	handleMessageClientWhisper(message, client){
+        let msg = new Message({route: "/client/whisper"});
+		let toClient = this.clientManager.getClient(message.data.clientId);
+		if(!toClient){
+            msg.setError("Client not found");
         }
         else {
-            room.setData(room.serialize());
-        }
-        return msg;
-	}
-
-	/**
-     * Handle a request to get a room's client list.
-	 * Return a ServerMessage with the client list.
-	 * @param {object} data
-	 * @param {string} data.room
-	 * @return {ServerMessage}
-	 */
-	handleRequestRoomGetClient(data){
-        let msg = new ServerMessage({cmd: Server.cmd.room.get});
-		let room = this.roomManager.getRoom(data.room);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-        else {
-            room.setData(room.clientManager.serialize());
-        }
-        return msg;
-	}
-
-	/**
-     * Handle a request to create a room.
-     * Immediately join the room if it is created.
-	 * Return a ServerMessage with ok or err.
-	 * @param {object} data
-	 * @param {string} data.room
-	 * @param {string} [data.password]
-	 * @param {boolean} [data.private]
-	 * @return {ServerMessage}
-	 */
-	handleRequestRoomCreate(data){
-        let msg = new ServerMessage({cmd: Server.cmd.room.create});
-		let room = this.roomManager.getRoom(data.room);
-
-		if(!room){
-			data.owner = client.id;
-			room = this.roomManager.create(data);
-			if(room){
-				msg = this.roomJoin(data);
-            }
-            else {
-                msg.setError("Failed to create room");
-            }
-		}
-		else {
-			msg.setError("Room already exists");
+			msg.setData({
+				from: client.id,
+				msg: msg.data.msg
+			});
+            toClient.writeJson(msg.serialize());
 		}
 		return msg;
 	}
 
 	/**
-     * Handle a request to join a room.
-	 * Return a ServerMessage with ok or err.
-	 * @param {object} data
-	 * @param {string} data.room
-	 * @param {string} [data.password]
+     * Handle a request to add a room.
+     * Immediately join the room if it is added.
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.name
+	 * @param {string} [message.data.password]
+	 * @param {boolean} [message.data.private]
 	 * @param {Client} client
-	 * @return {ServerMessage}
+	 * @return {Message}
 	 */
-	handleRequestRoomJoin(data, client){
-        let msg = new ServerMessage({cmd: Server.cmd.room.join});
-		let room = this.roomManager.getRoom(data.room);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-		else if(!room.join(client, data.password)){
-            msg.setError("Invalid password");
-        }
-        return msg;
-	}
+	handleMessageRoomAdd(message, client){
+        let msg = new Message({route: "/room/add"});
 
-	/**
-     * Handle a request to leave a room.
-	 * Return a ServerMessage with ok or err.
-	 * @param {object} data
-	 * @param {string} data.room
-	 * @param {Client} client
-	 * @return {ServerMessage}
-	 */
-	handleRequestRoomLeave(data, client){
-        let msg = new ServerMessage({cmd: Server.cmd.room.leave});
-		let room = this.roomManager.getRoom(data.room);
-		if(!room){
-            msg.setError("Invalid room");
-        }
+		// check if room exists
+		let room = this.roomManager.getRoom(message.data.name);
+		if(room){
+			msg.setError("Room already exists");
+			return msg;
+		}
+
+        message.data.owner = client.id;
+		room = this.roomManager.createRoom(message.data);
+		if(room){
+            room.addClient(client.id, client);
+            this.roomManager.addRoom(room.name, room);
+		}
 		else {
-            room.deleteClient(client.id)
-        }
+			msg.setError("Failed to create room");
+		}
 		return msg;
 	}
 
 	/**
      * Handle a request to delete a room.
-	 * Return a ServerMessage with ok or err.
-	 * @param {object} data
-	 * @param {string} data.room
-	 * @return {ServerMessage}
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.name
+	 * @param {Client} client
+	 * @return {Message}
 	 */
-	handleRequestRoomDelete(data){
-        let msg = new ServerMessage({cmd: Server.cmd.room.delete});
-		let room = this.roomManager.getRoom(data.room);
+	handleMessageRoomDelete(message, client){
+        let msg = new Message({route: "/room/delete"});
+		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -333,21 +330,23 @@ class Server extends EventEmitter {
             msg.setError("You are not the father");
         }
 		else {
-            this.roomManager(data.room)
+            this.roomManager.deleteRoom(message.data.name)
         }
 		return msg;
 	}
 
 	/**
      * Handle a request to empty a room.
-	 * Return a ServerMessage with ok or err.
-	 * @param {object} data
-	 * @param {string} data.room
-	 * @return {ServerMessage}
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.name
+	 * @param {Client} client
+	 * @return {Message}
 	 */
-	handleRequestRoomEmpty(data){
-        let msg = new ServerMessage({cmd: Server.cmd.room.empty});
-		let room = this.roomManager.getRoom(data.room);
+	handleMessageRoomEmpty(message, client){
+        let msg = new Message({route: "/room/empty"});
+		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -361,41 +360,114 @@ class Server extends EventEmitter {
 	}
 
 	/**
-     * Handle a request to kick a client from a room.
-	 * Return a ServerMessage with ok or err.
-	 * @param {object} data
-	 * @param {string} data.client
-	 * @param {string} data.room
-	 * @param {string} data.msg
-	 * @return {ServerMessage}
+     * Handle a request to get all rooms.
+	 * Return a Message with all rooms.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {number} message.data.index
+	 * @param {number} message.data.max
+	 * @param {Client} client
+	 * @return {Message}
 	 */
-	handleRequestRoomKickClient(data){
-        let msg = new ServerMessage({cmd: Server.cmd.room.kickClient});
-        let room = this.roomManager.getRoom(data.room);
+	handleMessageRoomGetAll(message, client){
+		let rooms = this.roomManager.serialize(message.data.index, message.data.max);
+		return new Message({
+			route: "/room/get/all",
+			data: {rooms: rooms}
+		});
+	}
+
+	/**
+     * Handle a request to get a room.
+	 * Return a Message with the room.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} [message.data.name] - room name if getting single room
+	 * @param {number} [message.data.max=25] - max number of rooms if getting all rooms
+	 * @param {number} [message.data.offset=0] - offset to start at if getting all rooms
+	 * @param {Client} client
+	 * @return {Message}
+	 */
+	handleMessageRoomGet(message, client){
+        let msg = new Message({route: "/room/get"});
+
+        // get a room by name
+        if(message.data && message.data.name){
+            let room = this.roomManager.getRoom(message.data.name);
+            if(room){
+                msg.setData(room.serialize());
+            }
+            else {
+                msg.setError("Invalid room");
+            }
+        }
+        // get all rooms
+        else {
+            let max = isNaN(message.data.max) ? 25 : message.data.max;
+            let offset = isNaN(message.data.offset) ? 0 : message.data.offset;
+            msg.setData(this.roomManager.serialize(max, offset));
+        }
+
+        return msg;
+	}
+
+	/**
+     * Handle a request to join a room.
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.room
+	 * @param {string} [message.data.password]
+	 * @param {Client} client
+	 * @return {Message}
+	 */
+	handleMessageRoomJoin(message, client){
+        let msg = new Message({route: "/room/join"});
+		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
-        else if(!room.isOwner(client.id)){
-            msg.setError("You are not the father");
+		else if(!room.join(client, message.data.password)){
+            msg.setError("Invalid password");
         }
-		else{
-			room.kickClient(data.client, data.msg);
-		}
+        return msg;
+	}
+
+	/**
+     * Handle a request to leave a room.
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.name
+	 * @param {Client} client
+	 * @return {Message}
+	 */
+	handleMessageRoomLeave(message, client){
+        let msg = new Message({route: "/room/leave"});
+		let room = this.roomManager.getRoom(message.data.name);
+		if(!room){
+            msg.setError("Invalid room");
+        }
+		else {
+            room.deleteClient(client.id)
+        }
 		return msg;
 	}
 
 	/**
      * Handle a request to ban a client from a room.
-	 * Return a ServerMessage with ok or err.
-	 * @param {object} data
-	 * @param {string} data.client
-	 * @param {string} data.room
-	 * @param {string} data.msg
-	 * @return {ServerMessage}
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.name
+	 * @param {string} message.data.clientId
+	 * @param {string} message.data.msg
+	 * @param {Client} client
+	 * @return {Message}
 	 */
-	handleRequestRoomBanClient(data){
-        let msg = new ServerMessage({cmd: Server.cmd.room.banClient});
-        let room = this.roomManager.getRoom(data.room);
+	handleMessageRoomBanClient(message, client){
+        let msg = new Message({route: "/room/client/ban"});
+        let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -403,86 +475,78 @@ class Server extends EventEmitter {
             msg.setError("You are not the father");
         }
 		else{
-			room.banClient(data.client, data.msg);
+			room.banClient(message.data.clientId, message.data.msg);
         }
 		return msg;
 	}
 
 	/**
-     * Handle a request to whisper directly to another client.
-     * Send the msg to the other client, if found.
-	 * Return a ServerMessage with the whispered msg or error.
+     * Handle a request to get a room's client list.
+	 * Return a Message with the client list.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.name
 	 * @param {Client} client
-	 * @param {object} data
-	 * @param {string} data.msg
-	 * @param {string} data.client
-	 * @return {ServerMessage}
+	 * @return {Message}
 	 */
-	handleRequestClientWhisper(client, data){
-        let msg = new ServerMessage({cmd: Server.cmd.client.whisper});
-		let toClient = this.clientManager.getClient(data.client);
-		if(!toClient){
-            msg.setError("Client not found");
+	handleMessageRoomGetClients(message, client){
+        let msg = new Message({route: "/room/client/get"});
+		let room = this.roomManager.getRoom(message.data.name);
+		if(!room){
+            msg.setError("Invalid room");
         }
         else {
-            msg.data = data;
-            msg.user = client.id;
-            toClient.writeJson(msg.serialize());
-		}
-		return msg;
-    }
+            msg.setData(room.clientManager.serialize());
+        }
+        return msg;
+	}
 
 	/**
-	 * Received command router
+     * Handle a request to kick a client from a room.
+	 * Return a Message with ok or err.
+	 * @param {Message} message
+	 * @param {object} message.data
+	 * @param {string} message.data.name
+	 * @param {string} message.data.clientId
+	 * @param {string} message.data.msg
 	 * @param {Client} client
-	 * @param {object} data
-	 * @return Server
+	 * @return {Message}
 	 */
-	routeMessage(client, data){
-		let response = null;
-		switch(data.cmd){
-			case Server.cmd.room.getAll:
-				response = this.handleRequestRoomGetAll(data);
-				break;
-			// case Server.cmd.room.get:
-			// 	response = this.handleRequestRoomGet(data);
-			// 	break;
-			// case Server.cmd.room.getClients:
-			// 	response = this.handleRequestRoomGetClient(data);
-			// 	break;
-			// case Server.cmd.room.create:
-			// 	response = this.handleRequestRoomCreate(data);
-			// 	break;
-			// case Server.cmd.room.join:
-			// 	response = this.handleRequestRoomJoin(data);
-			// 	break;
-			// case Server.cmd.room.leave:
-			// 	response = this.handleRequestRoomLeave(data);
-			// 	break;
-			// case Server.cmd.room.delete:
-			// 	response = this.handleRequestRoomDelete(data);
-			// 	break;
-			// case Server.cmd.client.whisper:
-			// 	response = this.handleRequestClientWhisper(client, data);
-			// 	break;
-			default:
-                this.logger.debug(`Cmd ${data.cmd} not found`);
-				break;
+	handleMessageRoomKickClient(message, client){
+        let msg = new Message({route: "/room/client/kick"});
+        let room = this.roomManager.getRoom(message.data.name);
+		if(!room){
+            msg.setError("Invalid room");
+        }
+        else if(!room.isOwner(client.id)){
+            msg.setError("You are not the father");
+        }
+		else{
+			room.kickClient(data.clientId, data.msg);
 		}
-		if(response){
-			client.writeJson(response.serialize());
+		return msg;
+	}
+
+	/**
+	 * Received command router.
+	 * @param {Message} message
+	 * @param {Client} client
+	 * @return {Server}
+	 */
+	routeMessage(message, client){
+        if(message.isDone()){
+            return this;
+        }
+		let responseMessage = null;
+		let route = this.router.get(message.route);
+		if(route){
+			responseMessage = route(message, client);
+		}
+		if(responseMessage){
+			client.writeMessage(responseMessage);
 		}
 		return this;
 	}
 }
-Server.cmd = {
-    client: {
-        whisper: 1
-	},
-	room: {
-		getAll: 2
-	}
-};
-
 
 module.exports = Server;

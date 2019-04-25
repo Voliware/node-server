@@ -38,9 +38,20 @@ class UdpServerListener extends ServerListener {
 	/**
 	 * Create a UDP server and listen
 	 * for incoming connections.
+	 * @return {UdpServerListener}
 	 */
 	listen(){
 		this.createUdpServer();
+		return this;
+	}
+
+	/**
+	 * Close the server listener.
+	 * Does nothing for UDP.
+	 * @return {UdpServerListener}
+	 */
+	close(){
+		return this;
 	}
 
 	/**

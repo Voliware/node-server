@@ -1,21 +1,25 @@
 const ObjectManager = require('./../util/objectManager');
+const Room = require('./room');
 
 /**
  * Manages rooms
- * @extends ObjectManager
+ * @extends {ObjectManager}
  */
 class RoomManager extends ObjectManager {
 
 	/**
 	 * Constructor
 	 * @param {object} [options={}]
-	 * @param {Room} [options.roomClass=Room]
+	 * @param {Room} [options.objectClass=Room]
 	 * @param {number} [options.maxRooms=0]
 	 * @param {string} [options.logHandle]
 	 * @return {RoomManager}
 	 */
 	constructor(options = {}){
-        let defaults = {logHandle: "RoomManager"};
+        let defaults = {
+            logHandle: "RoomManager",
+            objectClass: Room
+        };
 		super(Object.extend(defaults, options));
 		this.maxObjects = options.maxRooms || 0;
 		// aliases
@@ -32,7 +36,7 @@ class RoomManager extends ObjectManager {
 	attachRoomHandlers(room){
 		let self = this;
 		room.on('destroy', function(){
-			self.delete(room.name);
+			self.deleteRoom(room.name);
 		});
 		return this;
 	}
@@ -55,7 +59,16 @@ class RoomManager extends ObjectManager {
 	 */
 	addRoom(id, room){
 		return this.addObject(id, room);
-	}
+    }
+    
+    /**
+     * Create a room 
+     * @param {object} options 
+     * @return {Room}
+     */
+    createRoom(options){
+        return this.createObject(options);
+    }
 
 	/**
 	 * Delete a room
@@ -73,7 +86,15 @@ class RoomManager extends ObjectManager {
 	 */
 	getRoom(id){
 		return this.getObject(id);
-	}
+    }
+    
+    /**
+     * Get all rooms
+     * @return {object}
+     */
+    getRooms(){
+        return this.getObjects();
+    }
 
 	/**
 	 * Update a room

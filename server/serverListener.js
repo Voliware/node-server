@@ -39,9 +39,18 @@ class ServerListener extends EventEmitter {
     /**
      * Begin listening.
      * @param {object} [options]
+	 * @return {ServerListener}
      */
     listen(options){
         throw new Error("listen must be implemented");
+    }
+
+	/**
+	 * Close the server listener
+	 * @return {ServerListener}
+	 */
+    close(){
+        throw new Error("close must be implemented");
     }
 
     /**

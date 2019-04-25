@@ -111,7 +111,15 @@ class ObjectManager extends EventEmitter {
 	getObject(id){
 		this.logger.debug(`Get object ${id}`);
 		return this.objects[id];
-	}
+    }
+    
+    /**
+     * Get all objects
+     * @return {object}
+     */
+    getObjects(){
+        return this.objects;
+    }
 
 	/**
 	 * Update an object by replacing it.
@@ -156,13 +164,29 @@ class ObjectManager extends EventEmitter {
 	 * Serialize all objects that have a serialize method.
 	 * @return {object[]}
 	 */
-	serialize(){
-		let serializedObjects = [];
-		Util.each(this.objects, function(i, e){
-			if(e.serialize){
-				serializedObjects.push(e.serialize());
-			}
-		});
+	serialize(max = 0, offset = 0){
+        let serializedObjects = [];
+        for(let k in this.objects){
+            // skip until offset
+            if(offset > 0){
+                offset--;
+                continue;
+            }
+
+            // serialize object
+            let obj = this.objects[k];
+			if(obj.serialize){
+				serializedObjects.push(obj.serialize());
+            }
+
+            // quit at max
+            if(max > 0){
+                max--;
+                if(max === 0){
+                    break;
+                }
+            }
+        }
 		return serializedObjects;
 	}
 }

@@ -22,10 +22,21 @@ class TcpServerListener extends ServerListener {
 	/**
 	 * Create a TCP server and listen
 	 * for incoming connections.
+	 * @return {TcpServerListener}
 	 */
 	listen(){
 		this.createTcpServer();
 		this.logger.info(`Listening on ${this.host} port ${this.port}`);
+		return this;
+	}
+
+	/**
+	 * Close the server listener
+	 * @return {TcpServerListener}
+	 */
+	close(){
+		this.server.unref();
+		return this;
 	}
 
 	/**

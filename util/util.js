@@ -71,10 +71,10 @@ if (typeof Object.assign != 'function') {
 		}
 
 		target = Object(target);
-		for (var index = 1; index < arguments.length; index++) {
-			var source = arguments[index];
+		for (let index = 1; index < arguments.length; index++) {
+			let source = arguments[index];
 			if (source != null) {
-				for (var key in source) {
+				for (let key in source) {
 					if (Object.prototype.hasOwnProperty.call(source, key)) {
 						target[key] = source[key];
 					}
@@ -89,15 +89,18 @@ if (typeof Object.assign != 'function') {
 // https://jsfiddle.net/1vrkw1pc/
 if(typeof Object.extend != 'function'){
 	Object.extend = function(){
-		for(var i=1; i<arguments.length; i++)
-        for(var key in arguments[i])
-            if(arguments[i].hasOwnProperty(key)) { 
-                if (typeof arguments[0][key] === 'object'
-                    && typeof arguments[i][key] === 'object')
-					Object.extend(arguments[0][key], arguments[i][key]);
-                else
-                   arguments[0][key] = arguments[i][key];
-             }
+		for(let i = 1; i < arguments.length; i++){
+			for(let key in arguments[i]){
+				if(arguments[i].hasOwnProperty(key)) { 
+					if (typeof arguments[0][key] === 'object' && typeof arguments[i][key] === 'object') {
+						Object.extend(arguments[0][key], arguments[i][key]);
+					}
+					else{
+						arguments[0][key] = arguments[i][key];
+					}
+				}
+			}
+		}
 		return arguments[0];	
 	}
 }
@@ -122,8 +125,8 @@ if(typeof Object.filter !== 'function'){
  * @param {function} cb - callback
  */
 function each(data, cb){
-	for(var i in data){
-		var e = data[i];
+	for(let i in data){
+		let e = data[i];
 		cb(i, e);
 	}
 }

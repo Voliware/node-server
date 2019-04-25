@@ -1,11 +1,11 @@
 const ObjectManager = require('./../util/objectManager');
 const Client = require('./client');
+const Message = require ('../message/message');
 
 /**
  * ClientManager.
  * Manages clients.
  * Keeps track of client stats.
- * Can broadcast to all clients.
  * @extends {ObjectManager}
  */
 class ClientManager extends ObjectManager {
@@ -111,14 +111,15 @@ class ClientManager extends ObjectManager {
     }
 
 	/**
-	 * Kick a client
-	 * @param {string} id - client id
+	 * Disconnect all Clients.
 	 * @return {ClientManager}
 	 */
-	kickClient(id){
-        this.deleteClient(id);
+    disconnectClients(){
+		for(let k in this.clients){
+			this.clients[k].disconnect();
+		}
 		return this;
-	}
+    }
 
 	/**
 	 * Ban a client
@@ -126,10 +127,19 @@ class ClientManager extends ObjectManager {
 	 * @return {ClientManager}
 	 */
 	banClient(id){
-		this.kickClient(id);
+		this.deleteClient(id);
 		this.bannedList.push(id);
 		return this;
 	}
+
+    /**
+     * Determine if a client has been banned
+     * @param {number|string} clientId 
+     * @return {boolean}
+     */
+    isClientBanned(clientId){
+        return this.bannedList.indexOf(clientId) > -1;
+    }
     
     /**
      * Attach handlers to a client
@@ -139,36 +149,56 @@ class ClientManager extends ObjectManager {
     attachClientHandlers(client){
         return this;
     }
-
+	
 	/**
-	 * Broadcast to all clients
-	 * @param {object} msg - msg data
-	 * @return {ClientManager}
+	 * Serialize clients into an array
+	 * @return {Client[]}
 	 */
-	broadcast(msg){
+	serializeClients(){
+		let clients = [];
 		for(let k in this.clients){
 			let client = this.clients[k];
-			if(client.write){
-				client.write(msg);
+			if(client.serialize){
+				clients.push(client.serialize());
 			}
 		}
-		return this;
+		return clients;
+	}
+
+    ////////////////////////////////////////
+    // Broadcasting
+	////////////////////////////////////////
+	
+	/**
+	 * Generate a unique message id based on
+	 * the time and a client id
+	 * @param {string} clientId 
+	 * @param {number} time 
+	 * @return {string}
+	 */
+	generateMessageId(clientId, time){
+		if(time === this.lastMessageTime){
+			time += "_" + this.lastMessageTimeCounter++;
+		}
+		else {
+			this.lastMessageTimeCounter = 0;
+		}
+		this.lastMessageTime = time;
+		return clientId + time;
 	}
 
 	/**
-	 * Broadcast JSON data to all clients
-	 * @param {object} msg - msg data
+	 * Broadcast a message to all clients
+	 * @param {Message} message
 	 * @return {ClientManager}
 	 */
-	broadcastJson(msg){
+	broadcast(message){
 		for(let k in this.clients){
 			let client = this.clients[k];
-			if(client.writeJson){
-				client.writeJson(msg);
-			}
+			client.writeMessage(message);
 		}
 		return this;
-    }
+	}
 
     ////////////////////////////////////////
     // Object Manager overrides
@@ -200,7 +230,8 @@ class ClientManager extends ObjectManager {
 	serialize(){
 		return {
 			maxClients: this.maxClients,
-			clientCount: this.clientCount
+			clientCount: this.clientCount,
+			clients: this.serializeClients()
 		};
 	}
 }

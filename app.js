@@ -4,9 +4,9 @@ const WebSocketServer = require('./webSocket/webSocketServer');
 
 class AppExample {
     constructor(){
-        this.tcpServer = new TcpServer({port:666});
-        this.webSocketServer = new WebSocketServer({port:1234});
-        this.udpServer = new UdpServer({port:9000});
+        this.udpServer = new UdpServer({port: 9000});
+        this.tcpServer = new TcpServer({port: 666});
+        this.webSocketServer = new WebSocketServer({port: 1234});
 
         // start
         this.tcpServer.start();
