@@ -93,7 +93,6 @@ class TcpClient extends Client {
 	 * @return {*|Number|null} - returns null if it failed
 	 */
 	write(data) {
-		console.log("writing msg");	
 		return this.socket.write(data);
 	}
 

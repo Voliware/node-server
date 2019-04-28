@@ -1,5 +1,4 @@
 const Server = require('./../server/server');
-const WebSocketServerListener = require('./webSocketServerListener');
 const JsonMessage = require('./../json/jsonMessage');
 
 /**
@@ -17,8 +16,9 @@ class WebSocketServer extends Server {
     constructor(options = {}){
         let defaults = {
             logHandle: "WebSocketServer",
-            serverListener: new WebSocketServerListener({port: options.port}),
-            message: {constructor: JsonMessage}
+            type: "websocket",
+            port: options.port,
+            message: JsonMessage
         };
         super(Object.extend(defaults, options));
         return this;

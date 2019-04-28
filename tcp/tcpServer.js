@@ -1,5 +1,4 @@
 const Server = require('../server/server');
-const TcpServerListener = require('./tcpServerListener');
 const BufferJsonMessage = require('./../buffer/bufferJsonMessage');
 
 /**
@@ -17,8 +16,9 @@ class TcpServer extends Server {
     constructor(options = {}){
         let defaults = {
             logHandle: "TcpServer",
-            serverListener: new TcpServerListener({port: options.port}),
-            message: {constructor: BufferJsonMessage}
+            type: "tcp",
+            port: options.port,
+            message: BufferJsonMessage
         };
         super(Object.extend(defaults, options));
         return this;

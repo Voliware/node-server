@@ -63,7 +63,7 @@ class TcpServerListener extends ServerListener {
 	 * @param {object} [connectData] 
 	 * @return {TcpClient}
 	 */
-	createClient(socket, options, connectData){
+	createClient(socket, options = this.clientOptions, connectData){
 		let id = `${socket.remoteAddress}:${socket.remotePort}`;
 		let defaults = {
 			name: "TcpClient"+id,

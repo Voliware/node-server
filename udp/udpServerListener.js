@@ -96,7 +96,7 @@ class UdpServerListener extends ServerListener {
 	 * @param {object} [connectData] 
 	 * @return {UdpClient}
 	 */
-	createClient(socket, options, connectData){
+	createClient(socket, options = this.clientOptions, connectData){
 		let id = `${socket.address}:${socket.port}`;
 		let defaults = {
 			name: "UdpClient"+id,

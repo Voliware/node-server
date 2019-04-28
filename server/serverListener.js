@@ -20,6 +20,7 @@ class ServerListener extends EventEmitter {
     /**
      * Constructor
      * @param {object} [options={}]
+     * @param {object} [options.clientOptions={}] - options to pass to created crients
      * @param {string} [options.host="localhost"]
      * @param {number} [options.port=1337]
      * @param {number} [options.maxError=10]
@@ -31,6 +32,7 @@ class ServerListener extends EventEmitter {
         this.server = null;
 		this.host = options.host || "localhost";
         this.port = options.port || 1337;
+        this.clientOptions = options.clientOptions || {};
         this.maxErrors = isNaN(options.maxError) ? 10 : options.maxError;
         this.logger = new Logger(options.logHandle || this.host, this);
         return this;
@@ -56,12 +58,12 @@ class ServerListener extends EventEmitter {
     /**
      * Create a Client that has a socket of some kind.
      * @param {*} socket 
-     * @param {object} [options]
+     * @param {object} [options=this.clientOptions]
      * @param {string} [options.logHandle]
      * @param {*} data
      * @return {Client} 
      */
-    createClient(socket, options, data){
+    createClient(socket, options = this.clientOptions, data){
         throw new Error("createClient must be implemented");
     }
 }

@@ -34,11 +34,12 @@ class Client extends EventEmitter {
      * @param {number} [options.id]
      * @param {string} [options.name]
 	 * @param {Message} [options.message=Message] - constructor to use for creating Messages
-	 * @param {string} [options.dataType="buffer"] - the type of data the client receives
-     * @param {string} [options.bufferEncoding="utf8"] - rx/tx buffer encoding
-	 * @param {string} [options.bufferEof="\r"] - rx/tx buffer end of datagram character
+	 * @param {string} [options.data="buffer"] - the type of data the client receives
+     * @param {string} [options.encoding="utf8"] - rx/tx buffer encoding
+	 * @param {string} [options.eof="\r"] - rx/tx buffer end of datagram character
      * @param {string} [options.logHandle]
-     * @param {number} [options.heartbeatFrequency=10000] - how often to send a heartbeat
+     * @param {number} [options.timeout=0] - how long it can take for a client to respond to the server
+     * @param {number} [options.heartbeat=10000] - how often to send a heartbeat
      * @param {*} [options.connectData] - any additional data that came from connect
 	 * @return {Client}
 	 */
@@ -49,16 +50,16 @@ class Client extends EventEmitter {
         this.name = options.name || "Client" + this.id;
         
         // buffers
-        this.dataType = options.dataType || "buffer";
-        this.bufferEof = options.bufferEof || "\r";
-        this.bufferEncoding = options.txBufferEncoding || 'utf8';
-        this.rxBuffer = new MessageBuffer(this.dataType, this.bufferEncoding, this.bufferEof);
+        this.data = options.data || "buffer";
+        this.eof = options.eof || "\r";
+        this.encoding = options.encoding || 'utf8';
+        this.rxBuffer = new MessageBuffer(this.data, this.encoding, this.eof);
 
         // messaging
-        this.messageConstructor = options.message || Message;
+        this.message = options.message || Message;
         this.messageOptions = {
-            encoding: this.bufferEncoding,
-            eof: this.bufferEof
+            encoding: this.encoding,
+            eof: this.eof
         };
         
 		// message router
@@ -68,12 +69,13 @@ class Client extends EventEmitter {
         this.maxErrorCount = 4;
         this.lastPingSent = 0;
         this.latency = 0;
+        this.timeout = 0;
         this.connectData = options.connectData || null;
         this.logger = new Logger(options.logHandle || this.name, this);
 
         // heartbeat
         this.heartbeatInterval = null;
-        this.heartbeatFrequency = options.heartbeatFrequency || 10000;
+        this.heartbeat = options.heartbeat || 10000;
 
         // init
         this.addDefaultRoutes();
@@ -169,34 +171,6 @@ class Client extends EventEmitter {
     /////////////////////////////////////////////////////////
     // Messaging and routing
     ////////////////////////////////////////////////////////
-
-    /**
-     * Set the options for creating 
-     * messages to send to the client and for
-     * processing received data from the client.
-     * @param {Message} message 
-     * @return {Client} 
-     */
-    setMessageOptions(options){
-        if(options.constructor){
-            this.messageConstructor = options.constructor;
-        }
-        if(options.type){
-            this.dataType = options.type;
-        }
-        if(options.eof){
-            this.bufferEof = options.eof;
-        }
-        if(options.encoding){
-            this.bufferEncoding = options.encoding;
-        }
-        this.messageOptions = {
-            encoding: this.bufferEncoding,
-            eof: this.bufferEof
-        };
-        this.rxBuffer = new MessageBuffer(this.dataType, this.bufferEncoding, this.bufferEof);
-        return this;
-    }
     
 	/**
 	 * Create a message.
@@ -205,18 +179,9 @@ class Client extends EventEmitter {
      * @param {object} [options=null] - message options
 	 * @return {Message}
 	 */
-	createMessage(options = null){
-        let _options = {};
-        if(options){
-            // clone the default message options
-            _options = Object.assign({}, this.messageOptions);
-            // extend with passed in options
-            Object.extend(_options, options);
-        }
-        else {
-            _options = this.messageOptions;
-        }
-		return new this.messageConstructor(_options);
+	createMessage(options = {}){
+        Object.extend(options, this.messageOptions, options);
+		return new this.message(options);
 	}
 
 	/**
@@ -230,20 +195,11 @@ class Client extends EventEmitter {
 
     /**
      * Serialize a Message and write to the socket.
-     * This will take any kind of message.
-     * By default, it will create a new message from
-     * the Client's message constructor.
      * @param {Message} msg 
-     * @param {boolean} [useClientMessageType=true] - whether to convert the passed message
-     *                                                into the same type that this Client uses.
 	 * @return {*}
      */
-    writeMessage(msg, useClientMessageType = true){
-        let message = msg;
-        if(useClientMessageType){
-            message = this.createMessage(message);
-        }
-        return this.write(message.serialize());
+    writeMessage(msg){
+        return this.write(msg.serialize());
     }
 
     /**
@@ -339,7 +295,7 @@ class Client extends EventEmitter {
      * @return {Client}
      */
     startHeartbeat(){
-        this.heartbeatInterval = setInterval(this.heartbeat.bind(this), this.heartbeatFrequency);
+        this.heartbeatInterval = setInterval(this.heartbeat.bind(this), this.heartbeat);
         return this;
     }
 

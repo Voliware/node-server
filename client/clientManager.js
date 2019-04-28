@@ -13,14 +13,12 @@ class ClientManager extends ObjectManager {
 	/**
 	 * Constructor
 	 * @param {object} [options={}]
-	 * @param {number} [options.clientTimeout=0]
 	 * @param {number} [options.maxClients=0]
 	 * @return {ClientManager}
 	 */
 	constructor(options = {}){
         let defaults = {logHandle: "ClientManager"};
 		super(Object.extend(defaults, options));
-		this.clientTimeout = options.clientTimeout || 0;
 		this.maxObjects = options.maxClients || 0;
         this.bannedList = [];
 		// aliases

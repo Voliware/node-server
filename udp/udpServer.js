@@ -1,5 +1,4 @@
 const Server = require('../server/server');
-const UdpServerListener = require('./udpServerListener');
 const BufferJsonMessage = require('./../buffer/bufferJsonMessage');
 
 /**
@@ -16,11 +15,13 @@ class UdpServer extends Server {
      */
     constructor(options = {}){
         let defaults = {
-            logHandle: "WebSocketServer",
-            serverListener: new UdpServerListener({port: options.port}),
-            message: {constructor: BufferJsonMessage}
+            logHandle: "UdpServer",
+            type: "udp",
+            port: options.port,
+            message: BufferJsonMessage
         };
         super(Object.extend(defaults, options));
+        // todo: this needs to be done in a more intuitive way
         this.serverListener.setClientManager(this.clientManager);
         return this;
     }

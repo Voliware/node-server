@@ -4,6 +4,9 @@ const ServerListener = require ('./serverListener');
 const Client = require('./../client/client');
 const ClientManager = require('./../client/clientManager');
 const RoomManager = require('./../room/roomManager');
+const UdpServerListener = require('./../udp/udpServerListener');
+const TcpServerListener = require('./../tcp/tcpServerListener');
+const WebSocketServerListener = require('./../webSocket/webSocketServerListener');
 const Logger = require('./../util/logger');
 
 /**
@@ -18,66 +21,107 @@ class Server extends EventEmitter {
 
 	/**
 	 * Constructor
-	 * @param {object} options
-	 * @param {ServerListener} options.serverListener
-	 * @param {string} [options.name="server"]
-	 * @param {string} [options.logHandle]
-	 * @param {function} [options.router]
-	 * @param {object} [options.clientManagerOptions={}]
-	 * @param {object} [options.roomManagerOptions={}]
-	 * @param {object} [options.message={}] - message options for the Client
-	 * @param {function} [options.message.constructor=Message] - the Message type (constructor)
-	 * @param {string} [options.message.type="buffer"] - the type of data the client receives
-     * @param {string} [options.message.encoding="utf8"] - rx/tx buffer encoding
-	 * @param {string} [options.message.eof="\r"] - rx/tx buffer end of datagram character
+	 * @param {object} [options={}]
+	 * @param {string} [options.name="Server"] - the name of the server
+     * @param {string} [options.host="localhost"] - the host address
+     * @param {number} [options.port=3000] - the port to listen on
+     * @param {string} [options.type="websocket"] - the server type
+     * @param {string} [options.data="buffer"] - for tcp/udp, what format to send/receive data in, ie buffer or string.
+     *                 For Websocket, this is not relevant.
+     * @param {Message} [options.message=Message] - the type of message to use
+     * @param {number} [options.maxErrors=0] - max num of errors the server can tolerate, or 0 for no max
+     * @param {number} [options.maxClients=0] - max num of clients, or 0 for no max
+     * @param {number} [options.maxClientErrors=0] - how many errors a client can have before disconnecting it
+     * @param {number} [options.maxRooms=0] - max num of rooms, or 0 for no max
+     * @param {number} [options.clientTimeout=0] - how long to give a client to respond to a message, 0 for no limit. 
+     * @param {number} [options.heartbeat=10000] - how often to send a heartbeat to UDP clients
+	 * @param {ServerListener} [options.serverListener] - the type of server listener to use. If specified
+     *                         this will replace the server listener determined by options.type.                          
+	 * @param {string} [options.logHandle] - the log handle
+	 * @param {function} [options.router] - the router to route requests
 	 * @return {Server}
 	 */
-	constructor(options){
+	constructor(options = {}){
 		super();
 
-		// properties
-		this.serverListener = options.serverListener || null;
+		// server properties
 		this.name = options.name || "Server";
-		this.port;
-		this.host;
+        this.host = options.host || "localhost";
+		this.port = options.port || 3000;
+        this.type = options.type || "websocket";
+        this.data = options.data || "buffer";
+        this.message = options.message || Message;
+        this.maxErrors = options.maxErrors || 0;
+        this.maxClients = options.maxClients || 0;
+        this.maxClientErrors = options.maxClientErrors || 0;
+        this.maxRooms = options.maxRooms || 0;
+        this.clientTimeout = options.clientTimeout || 0;
+        this.heartbeat = options.heartbeat || 1000;
+        
+        // server listener
+        // if passed, used passed server listener, 
+        // otherwise use options.type to create one
+        this.serverListener = options.serverListener || null;
+        if(!this.serverListener){
+            this.serverListener = this.createServerListener(this.type, {
+                host: this.host,
+                port: this.port,
+                maxErrors: this.maxErrors,
+                clientOptions: {
+                    message: this.message,
+                    data: this.data,
+                    encoding: this.encoding,
+                    eof: this.eof,
+                    heartbeat: this.heartbeat
+                }
+            });
+        }
 
-		this.clientManagerOptions = options.clientManagerOptions || {};
-		this.roomManagerOptions = options.roomManagerOptions || {};
+        // required for buffer based message construction (UDP/TCP)
+        this.messageOptions = {
+            eof: this.eof,
+            encoding: this.encoding
+        };
 
         // components
         this.logger = new Logger(options.logHandle || this.name, this);
-		this.clientManager = this.createClientManager(this.clientManagerOptions);
-		this.roomManager = this.createRoomManager(this.roomManagerOptions);
+		this.clientManager = this.createClientManager({maxClients: this.maxClients});
+		this.roomManager = this.createRoomManager({maxRooms: this.maxRooms});
 		this.router = options.router || new Map();
 
 		// set the log handle of each component to the same name of the server
-		this._serverListener.logger.setLogHandle(this.name, this._serverListener);
+		this.serverListener.logger.setLogHandle(this.name, this.serverListener);
 		this.clientManager.logger.setLogHandle(this.name, this.clientManager);
 		this.roomManager.logger.setLogHandle(this.name, this.roomManager);
 
-		// messaging
-		if(!options.message){
-			options.message = {};
-		}
-		// these options will be passed to Clients
-		// they are not used at all on the server level
-		this.messageOptions = {
-			constructor: options.message.constructor || Message,
-			// these would only apply to UDP/TCP clients
-			type: options.message.type || "buffer",
-			eof: options.message.eof || "\r",
-			encoding: options.message.encoding || 'utf8'
-		};
-
 		// handlers
-		this.attachServerListenerHandlers(this._serverListener);
+		this.attachServerListenerHandlers(this.serverListener);
 		this.attachClientManagerHandlers(this.clientManager);
 		this.attachRoomManagerHandlers(this.roomManager);
 
 		// init
 		this.addDefaultRoutes();
 		return this;
-	}
+    }
+    
+    /**
+     * Create a server listener based on its protocol type.
+     * @param {string} type 
+     * @param {object} [options={}] 
+     * @return {ServerListener|number} - return -1 if type not found
+     */
+    createServerListener(type, options = {}){
+        switch(type){
+            case Server.type.udp:
+                return new UdpServerListener(options);
+            case Server.type.tcp:
+                return new TcpServerListener(options);
+            case Server.type.websocket:
+                return new WebSocketServerListener(options);
+        }
+        // return -1 since this.serverListener can be null
+        return -1;
+    }
 
 	/**
 	 * Get the ServerListener
@@ -95,6 +139,9 @@ class Server extends EventEmitter {
 	 * @param {ServerListener} serverListener 
 	 */
 	set serverListener(serverListener) {
+        if(serverListener === null){
+            return;
+        }
 		if(!(serverListener instanceof ServerListener)){
 			throw new Error("ServerListener must be instanceof ServerListener");
 		}
@@ -105,22 +152,6 @@ class Server extends EventEmitter {
 			throw new Error("ServerListener port is invalid");
 		}
 		this._serverListener = serverListener;
-	}
-
-	/**
-	 * Get the port
-	 * @return {number} 
-	 */
-	get port(){
-		return this.serverListener.port;
-	}
-
-	/**
-	 * Get the host
-	 * @return {string} 
-	 */
-	get host(){
-		return this.serverListener.host;
 	}
 
 	/**
@@ -168,7 +199,6 @@ class Server extends EventEmitter {
 			throw new Error("client must be an instanceof Client");
 		}
 
-		client.setMessageOptions(this.messageOptions);
 		this.attachClientHandlers(client);
 		this.clientManager.addClient(client.id, client);
 		client.ping();
@@ -230,7 +260,17 @@ class Server extends EventEmitter {
 
     /////////////////////////////////////
     // Messages
-	/////////////////////////////////////
+    /////////////////////////////////////
+    
+    /**
+     * Create a message to send to a client.
+     * @param {object} [options={}] 
+     * @return {Message}
+     */
+    createMessage(options = {}){
+        Object.extend(options, this.messageOptions, options);
+        return new this.message(options);
+    }
 
     /**
      * Add the default routes to the router map.
@@ -262,7 +302,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageClientWhisper(message, client){
-        let msg = new Message({route: "/client/whisper"});
+        let msg = this.createMessage({route: "/client/whisper"});
 		let toClient = this.clientManager.getClient(message.data.clientId);
 		if(!toClient){
             msg.setError("Client not found");
@@ -290,7 +330,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomAdd(message, client){
-        let msg = new Message({route: "/room/add"});
+        let msg = this.createMessage({route: "/room/add"});
 
 		// check if room exists
 		let room = this.roomManager.getRoom(message.data.name);
@@ -321,7 +361,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomDelete(message, client){
-        let msg = new Message({route: "/room/delete"});
+        let msg = this.createMessage({route: "/room/delete"});
 		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
@@ -345,7 +385,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomEmpty(message, client){
-        let msg = new Message({route: "/room/empty"});
+        let msg = this.createMessage({route: "/room/empty"});
 		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
@@ -371,7 +411,7 @@ class Server extends EventEmitter {
 	 */
 	handleMessageRoomGetAll(message, client){
 		let rooms = this.roomManager.serialize(message.data.index, message.data.max);
-		return new Message({
+		return this.createMessage({
 			route: "/room/get/all",
 			data: {rooms: rooms}
 		});
@@ -389,7 +429,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomGet(message, client){
-        let msg = new Message({route: "/room/get"});
+        let msg = this.createMessage({route: "/room/get"});
 
         // get a room by name
         if(message.data && message.data.name){
@@ -422,7 +462,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomJoin(message, client){
-        let msg = new Message({route: "/room/join"});
+        let msg = this.createMessage({route: "/room/join"});
 		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
@@ -443,7 +483,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomLeave(message, client){
-        let msg = new Message({route: "/room/leave"});
+        let msg = this.createMessage({route: "/room/leave"});
 		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
@@ -466,7 +506,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomBanClient(message, client){
-        let msg = new Message({route: "/room/client/ban"});
+        let msg = this.createMessage({route: "/room/client/ban"});
         let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
@@ -490,7 +530,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomGetClients(message, client){
-        let msg = new Message({route: "/room/client/get"});
+        let msg = this.createMessage({route: "/room/client/get"});
 		let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
@@ -513,7 +553,7 @@ class Server extends EventEmitter {
 	 * @return {Message}
 	 */
 	handleMessageRoomKickClient(message, client){
-        let msg = new Message({route: "/room/client/kick"});
+        let msg = this.createMessage({route: "/room/client/kick"});
         let room = this.roomManager.getRoom(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
@@ -548,5 +588,10 @@ class Server extends EventEmitter {
 		return this;
 	}
 }
+Server.type = {
+    udp: "udp",
+    tcp: "tcp",
+    websocket: "websocket"
+};
 
 module.exports = Server;
