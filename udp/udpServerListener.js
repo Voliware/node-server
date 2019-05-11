@@ -77,6 +77,7 @@ class UdpServerListener extends ServerListener {
 			else {
 				client = self.createClient(rinfo);
 				self.emit('connect', client);
+				client.socketReceive(message, rinfo);
 			}
 		});
 		this.server.on('error', function(error){

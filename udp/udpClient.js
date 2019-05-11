@@ -16,7 +16,10 @@ class UdpClient extends Client {
 	 * @return {UdpClient}
 	 */
 	constructor(socket, options={}){
-        let defaults = {logHandle: "UdpClient"};
+        let defaults = {
+            logHandle: "UdpClient",
+            heartbeatFrequency: 1000
+        };
         super(socket, Object.extend(defaults, options));
 		return this;
 	}

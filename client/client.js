@@ -39,7 +39,8 @@ class Client extends EventEmitter {
 	 * @param {string} [options.eof="\r"] - rx/tx buffer end of datagram character
      * @param {string} [options.logHandle]
      * @param {number} [options.timeout=0] - how long it can take for a client to respond to the server
-     * @param {number} [options.heartbeat=10000] - how often to send a heartbeat
+     * @param {number} [options.heartbeatFrequency=0] - how often to send a heartbeat, 0 for never
+     * @param {function} [options.heartbeatRequest] - the heartbeat request function
      * @param {*} [options.connectData] - any additional data that came from connect
 	 * @return {Client}
 	 */
@@ -75,11 +76,16 @@ class Client extends EventEmitter {
 
         // heartbeat
         this.heartbeatInterval = null;
-        this.heartbeat = options.heartbeat || 10000;
+        this.heartbeatFrequency = options.heartbeatFrequency || 0;
+        this.heartbeatRequest = options.heartbeatRequest || this.heartbeatRequest;
 
         // init
         this.addDefaultRoutes();
         this.attachSocketHandlers(this.socket);
+
+        if(this.heartbeatFrequency){
+           // this.startHeartbeat();
+        }
 
 		return this;
     }
@@ -211,7 +217,7 @@ class Client extends EventEmitter {
      */
     handleMessagePing(message){
         message.setDone();
-        return this.createMessage({route: Client.route.pong});
+        return this.createMessage({route: "/pong"});
     }
 
     /**
@@ -229,12 +235,25 @@ class Client extends EventEmitter {
     }
 
     /**
+     * Handle a heartbeat message by returning
+     * a heartbeat message.
+     * @param {Message} message 
+     * @return {null}
+     */
+    handleMessageHeartbeat(message){
+        message.setDone();
+        console.log("hi")
+        return this.createMessage({route: "/hb"});
+    }
+
+    /**
      * Add the default routes to the router map.
      * @return {Client}
      */
 	addDefaultRoutes(){
-		this.router.set(Client.route.ping, this.handleMessagePing.bind(this));
-		this.router.set(Client.route.pong, this.handleMessagePong.bind(this));
+		this.router.set("/ping", this.handleMessagePing.bind(this));
+        this.router.set("/pong", this.handleMessagePong.bind(this));
+        this.router.set("/hb", this.handleMessageHeartbeat.bind(this));
 		return this;
 	}
 
@@ -250,6 +269,7 @@ class Client extends EventEmitter {
 			responseMessage = route(message);
 		}
 		if(responseMessage){
+            console.log(responseMessage.route)
 			this.writeMessage(responseMessage);
         }
         this.emit("message", message);
@@ -262,7 +282,7 @@ class Client extends EventEmitter {
      */
     ping(){
         this.updateLastPingSent();
-        let message = this.createMessage({route: Client.route.ping})
+        let message = this.createMessage({route: "/ping"})
         return this.writeMessage(message);
     }
 
@@ -271,7 +291,7 @@ class Client extends EventEmitter {
 	 * @return {*|Number}
      */
     pong(){
-        let message = this.createMessage({route: Client.route.pong})
+        let message = this.createMessage({route: "/pong"})
         return this.writeMessage(message);
     }
 
@@ -291,11 +311,21 @@ class Client extends EventEmitter {
     /////////////////////////////////////////////////////////
 
     /**
+     * Create a heartbeat message and write to the socket.
+     * @return {Client}
+     */
+    heartbeatRequest(){
+        let msg = this.createMessage({route: "/hb"});
+        this.writeMessage(msg);
+        return this;
+    }
+
+    /**
      * Start the heartbeat interval.
      * @return {Client}
      */
     startHeartbeat(){
-        this.heartbeatInterval = setInterval(this.heartbeat.bind(this), this.heartbeat);
+        this.heartbeatInterval = setInterval(this.heartbeatRequest.bind(this), this.heartbeatFrequency);
         return this;
     }
 
@@ -329,6 +359,7 @@ class Client extends EventEmitter {
         
         for(let i = 0; i < messages.length; i++){
             this.routeMessage(messages[i]);
+            // console.log(messages[i])
             this.emit('message', messages[i]);
         }
 		return this;
@@ -345,15 +376,11 @@ class Client extends EventEmitter {
         for(let i = 0; i < datagrams.length; i++){
             let message = this.createMessage();
             message.deserialize(datagrams[i]);
-            console.log(message);
+            // console.log(message);
             messages.push(message);
         }
 		return messages;
     }
 }
-Client.route = {
-    ping: "/ping",
-    pong: "/pong"
-};
 
 module.exports = Client;
