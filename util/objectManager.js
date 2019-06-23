@@ -1,5 +1,4 @@
 const EventEmitter = require('events').EventEmitter;
-const Util = require('./util');
 const crypto = require("crypto");
 const Logger = require('./logger');
 

@@ -117,10 +117,10 @@ class Logger {
 	 * printed directly to the console.
 	 * @param {string} level 
 	 * @param {object|string} msg 
+	 * @param {boolean} [isObject=false]
 	 */
-	_log(level, msg){
+	_log(level, msg, isObject = false){
 		let log = "";
-		let isObject = false
 		if(typeof msg === "string" || typeof msg === "number"){
 			log = `${this.logHandle} ${msg}`;
 		}

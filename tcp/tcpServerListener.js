@@ -64,14 +64,14 @@ class TcpServerListener extends ServerListener {
 	 * @return {TcpClient}
 	 */
 	createClient(socket, options = this.clientOptions, connectData){
-		let id = `${socket.remoteAddress}:${socket.remotePort}`;
+		let id = `@${socket.remoteAddress}:${socket.remotePort}`;
 		let defaults = {
 			name: "TcpClient"+id,
 			id: id,
 			logHandle: this.logger.handle
 		};
-		Object.extend(defaults, options);
-		return new TcpClient(socket, defaults);
+		let opts = Object.extend(this.clientOptions, defaults, options);
+		return new TcpClient(socket, opts);
 	}
 }
 

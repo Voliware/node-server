@@ -1,11 +1,13 @@
 const EventEmitter = require('events').EventEmitter;
 const Message = require ('../message/message');
 const ServerListener = require ('./serverListener');
+const ServerMonitor = require('./serverMonitor');
 const Client = require('./../client/client');
 const ClientManager = require('./../client/clientManager');
 const RoomManager = require('./../room/roomManager');
 const UdpServerListener = require('./../udp/udpServerListener');
 const TcpServerListener = require('./../tcp/tcpServerListener');
+const HttpServerListener = require('./../http/httpServerListener');
 const WebSocketServerListener = require('./../webSocket/webSocketServerListener');
 const Logger = require('./../util/logger');
 
@@ -42,7 +44,9 @@ class Server extends EventEmitter {
 	 * @return {Server}
 	 */
 	constructor(options = {}){
-		super();
+        super();
+        
+        this.options = options;
 
 		// server properties
 		this.name = options.name || "Server";
@@ -57,6 +61,8 @@ class Server extends EventEmitter {
         this.maxRooms = options.maxRooms || 0;
         this.clientTimeout = options.clientTimeout || 0;
         this.heartbeat = options.heartbeat || 1000;
+
+        this.monitor = new ServerMonitor();
         
         // server listener
         // if passed, used passed server listener, 
@@ -116,6 +122,9 @@ class Server extends EventEmitter {
                 return new UdpServerListener(options);
             case Server.type.tcp:
                 return new TcpServerListener(options);
+            case Server.type.http:
+            case Server.type.https:
+                return new HttpServerListener(options);
             case Server.type.websocket:
                 return new WebSocketServerListener(options);
         }
@@ -159,6 +168,7 @@ class Server extends EventEmitter {
 	 * @return {Server}
 	 */
 	start(){
+        this.monitor.start();
 		this.serverListener.listen();
 		return this;
 	}
@@ -171,6 +181,7 @@ class Server extends EventEmitter {
 		this.clientManager.disconnectClients();
 		this.clientManager.empty();
 		this.serverListener.close();
+        this.monitor.stop();
 		return this;
 	}
 
@@ -304,15 +315,15 @@ class Server extends EventEmitter {
 	handleMessageClientWhisper(message, client){
         let msg = this.createMessage({route: "/client/whisper"});
 		let toClient = this.clientManager.getClient(message.data.clientId);
-		if(!toClient){
-            msg.setError("Client not found");
-        }
-        else {
+		if(toClient){
 			msg.setData({
 				from: client.id,
 				msg: msg.data.msg
 			});
-            toClient.writeJson(msg.serialize());
+            toClient.writeMessage(msg.serialize());
+        }
+        else {
+            msg.setError("Client not found");
 		}
 		return msg;
 	}
@@ -591,6 +602,8 @@ class Server extends EventEmitter {
 Server.type = {
     udp: "udp",
     tcp: "tcp",
+    http: "http",
+    https: "https",
     websocket: "websocket"
 };
 

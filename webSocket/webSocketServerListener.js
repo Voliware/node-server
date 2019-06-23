@@ -1,7 +1,4 @@
-const fs = require('fs');
-const http = require('http');
-const https = require('https');
-const ServerListener = require('../server/serverListener');
+const HttpServerListener = require('../http/httpServerListener');
 const WebSocketServer = require('ws').Server;
 const WebSocketClient = require('./webSocketClient');
 
@@ -11,68 +8,30 @@ const WebSocketClient = require('./webSocketClient');
  * The WebSocketServer will emit connection events.
  * On a connection, WebSocketServerListener will emit a 
  * "connect" event with a WebSocketClientSocket. 
- * @extends {ServerListener}
+ * @extends {HttpServerListener}
  */
-class WebSocketServerListener extends ServerListener {
+class WebSocketServerListener extends HttpServerListener {
 
 	/**
 	 * Constructor
 	 * @param {object} [options]
-	 * @param {string} [options.host='localhost']
-	 * @param {number} [options.port=80]
-	 * @param {boolean} [options.https=false]
-	 * @param {string} [options.certificatePath='sslcert/server.cert']
-	 * @param {string} [options.privateKeyPath='sslcert/server.key']
-	 * @param {string} [options.logHandle]
 	 * @return {WebSocketServerListener}
 	 */
 	constructor(options = {}){
-		let defaults = {
-			host: 'localhost',
-			port: 80,
-			https: false,
-			certificatePath: 'sslcert/server.cert',
-			privateKeyPath: 'sslcert/server.key',
-			logHandle: 'WebSocketServerListener'
-		};
+		let defaults = {logHandle: 'WebSocketServerListener'};
 		super(Object.extend(defaults, options));
-
-		// properties
-		this.https = defaults.https;
-		this.certificate = null;
-		this.privateKey = null;
-		this.certificatePath = defaults.certificatePath;
-		this.privateKeyPath = defaults.privateKeyPath;
-
-		// set certs
-		if(typeof this.certificatePath === "string"){
-			this.setSslCertificateFromFile(this.certificatePath);
-		}
-		if(typeof this.privateKeyPath === "string"){
-			this.setSslPrivateKeyFromFile(this.privateKeyPath);
-		}
-
 		return this;
 	}
 
 	/**
 	 * Start an HTTP/S server and a WebSocket server.
 	 * Begin listening on the WebSocket server.
-	 * @param {object} [options]
 	 * @return {WebSocketServerListener}
 	 */
-	listen(options){
-		if(this.https === true){
-			this.server = this.createHttpsServer(null);
-		}
-		else {
-			this.server = this.createHttpServer(null);
-		}
-		this.webSocketServer = this.createWebSocketServer(this.server);
-
-		this.attachHttpServerHandlers();
-		this.attachWebSocketServerHandlers();
-		this.logger.info(`Listening on ${this.host} port ${this.port}`);
+	listen(){
+        super.listen();
+        this.webSocketServer = this.createWebSocketServer(this.httpServer);
+        this.attachWebSocketServerHandlers();
 		return this;
 	}
 
@@ -81,72 +40,8 @@ class WebSocketServerListener extends ServerListener {
 	 * @return {WebSocketServerListener}
 	 */
 	close(){
+        super.close();
 		this.webSocketServer.close();
-		return this;
-	}
-
-	/**
-	 * Set SSL cerficiate a provided path or from
-	 * the path setting that was passed in the constructor.
-	 * @param {string} path
-	 * @return {WebSocketServerListener}
-	 */
-	setSslCertificateFromFile(path){
-		this.certificate = fs.readFileSync(path, 'utf8');
-		return this;
-	}
-
-	/**
-	 * Set SSL cerficiate a provided path or from
-	 * the path setting that was passed in the constructor.
-	 * @param {string} path
-	 * @return {WebSocketServerListener}
-	 */
-	setSslPrivateKeyFromFile(path){
-		this.privateKey = fs.readFileSync(path, 'utf8');
-		return this;
-	}
-
-	/**
-	 * Create an HTTP server.
-	 * @param {object} listener
-	 * @return {Server}
-	 */
-	createHttpServer(listener){
-		let server = http.createServer(listener);
-		server.listen({
-			host: this.host,
-			port: this.port
-		});
-        this.logger.info(`HTTP server started on ${this.host} on port ${this.port}`);
-		return server;
-	}
-
-	/**
-	 * Create an HTTPS server.
-	 * Requires that keys are set.
-	 * @param {object} listener
-	 * @return {WebSocketServerListener}
-	 */
-	createHttpsServer(listener){
-		let server = https.createServer({key: this.privateKey, cert: this.certificate}, listener);
-		server.listen({
-			host: this.host,
-			port: this.port
-		});
-        this.logger.info(`HTTPS server started on ${this.host} on port ${this.port}`);
-		return server;
-	}
-
-	/**
-	 * Attach handlers to the HTTP server
-	 * @return {WebSocketServerListener}
-	 */
-	attachHttpServerHandlers(){
-		let self = this;
-		this.server.on('error', function(error){
-			self.logger.error(error);
-		});
 		return this;
 	}
 
@@ -188,15 +83,15 @@ class WebSocketServerListener extends ServerListener {
 	 * @param {object} [connectData] 
 	 * @return {WebSocketClient}
 	 */
-	createClient(socket, options, connectData){
-		let id = `${socket._socket.remoteAddress}:${socket._socket.remotePort}`;
+	createClient(socket, options = this.clientOptions, connectData){
+		let id = `@${socket._socket.remoteAddress}:${socket._socket.remotePort}`;
 		let defaults = {
 			name: "WSClient"+id,
 			id: id,
 			logHandle: this.logger.handle
 		};
-		Object.extend(defaults, options);
-		return new WebSocketClient(socket, defaults);
+		let opts = Object.extend(this.clientOptions, defaults, options);
+		return new WebSocketClient(socket, opts);
 	}
 }
 

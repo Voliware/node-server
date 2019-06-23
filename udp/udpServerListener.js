@@ -97,18 +97,18 @@ class UdpServerListener extends ServerListener {
 	 * @param {object} [connectData] 
 	 * @return {UdpClient}
 	 */
-	createClient(socket, options = this.clientOptions, connectData){
-		let id = `${socket.address}:${socket.port}`;
+	createClient(socket, options, connectData){
+		let id = `@${socket.address}:${socket.port}`;
 		let defaults = {
 			name: "UdpClient"+id,
 			id: id,
 			logHandle: this.logger.handle
 		};
-		Object.extend(defaults, options);
+		let opts = Object.extend(this.clientOptions, defaults, options);
 		let udpSocket = new UdpSocket(socket.address, socket.port, {
 			logHandle: "UdpClient"+id
 		});
-		return new UdpClient(udpSocket, defaults);
+		return new UdpClient(udpSocket, opts);
 	}
 }
 
