@@ -1,6 +1,6 @@
 const EventEmitter = require('events').EventEmitter;
 const crypto = require("crypto");
-const Logger = require('./logger');
+const Logger = require('@voliware/logger');
 
 /**
  * Object Manager.

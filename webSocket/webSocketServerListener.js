@@ -84,6 +84,7 @@ class WebSocketServerListener extends HttpServerListener {
 	 * @return {WebSocketClient}
 	 */
 	createClient(socket, options = this.clientOptions, connectData){
+        console.log(socket);
 		let id = `@${socket._socket.remoteAddress}:${socket._socket.remotePort}`;
 		let defaults = {
 			name: "WSClient"+id,

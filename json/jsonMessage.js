@@ -28,11 +28,12 @@ class JsonMessage extends Message {
     fromJsonString(string){
 		let obj = null;
 		try {
+            // console.log(string)
 			obj = JSON.parse(string);
 		}
 		catch(error){
 			console.error("fromJsonString: failed to parse JSON");
-            //console.error(error);
+            // console.error(error);
         }
 
         if(obj){

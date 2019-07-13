@@ -1,6 +1,6 @@
 const EventEmitter = require('events').EventEmitter;
 const dgram = require('dgram');
-const Logger = require('./../util/logger');
+const Logger = require('@voliware/logger');
 
 /**
  * Virtual UDP Socket

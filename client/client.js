@@ -1,7 +1,7 @@
 const EventEmitter = require('events').EventEmitter;
 const Message = require('./../message/message');
 const MessageBuffer = require('./../message/messageBuffer');
-const Logger = require('./../util/logger');
+const Logger = require('@voliware/logger');
 
 /**
  * Client.
@@ -269,7 +269,7 @@ class Client extends EventEmitter {
 			responseMessage = route(message);
 		}
 		if(responseMessage){
-            console.log(responseMessage.route)
+            // console.log(responseMessage.route)
 			this.writeMessage(responseMessage);
         }
         this.emit("message", message);

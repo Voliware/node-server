@@ -16,9 +16,6 @@ class AppExample {
         this.httpServer.start();
         this.webSocketServer.start();
 
-        setTimeout(()=>{
-            this.webSocketServer.stop();
-        },5000)
         return this;
     }
 }

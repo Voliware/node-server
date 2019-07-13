@@ -62,7 +62,7 @@ class HttpServerListener extends ServerListener {
             this.certificate = fs.readFileSync(path, 'utf8');
         }
         else {
-            this.logger.warn("SSL cert file does not exist");
+            this.logger.warning("SSL cert file does not exist");
         }
 		return this;
 	}
@@ -78,7 +78,7 @@ class HttpServerListener extends ServerListener {
             this.privateKey = fs.readFileSync(path, 'utf8');
         }
         else {
-            this.logger.warn("SSL key file does not exist");
+            this.logger.warning("SSL key file does not exist");
         }
 		return this;
 	}

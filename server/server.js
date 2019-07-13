@@ -9,7 +9,7 @@ const UdpServerListener = require('./../udp/udpServerListener');
 const TcpServerListener = require('./../tcp/tcpServerListener');
 const HttpServerListener = require('./../http/httpServerListener');
 const WebSocketServerListener = require('./../webSocket/webSocketServerListener');
-const Logger = require('./../util/logger');
+const Logger = require('@voliware/logger');
 
 /**
  * Generic Server with Client and Room management.
@@ -96,9 +96,9 @@ class Server extends EventEmitter {
 		this.router = options.router || new Map();
 
 		// set the log handle of each component to the same name of the server
-		this.serverListener.logger.setLogHandle(this.name, this.serverListener);
-		this.clientManager.logger.setLogHandle(this.name, this.clientManager);
-		this.roomManager.logger.setLogHandle(this.name, this.roomManager);
+		this.serverListener.logger.setName(this.name).setContext(this.serverListener);
+		this.clientManager.logger.setName(this.name).setContext(this.clientManager);
+		this.roomManager.logger.setName(this.name).setContext(this.roomManager);
 
 		// handlers
 		this.attachServerListenerHandlers(this.serverListener);

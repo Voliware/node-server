@@ -1,5 +1,6 @@
 const EventEmitter = require('events').EventEmitter;
-const Logger = require('../util/logger');
+const Logger = require('@voliware/logger');
+
 
 /**
  * An abstract server connection listener.

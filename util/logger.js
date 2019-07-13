@@ -138,7 +138,7 @@ class Logger {
 				res = this.logger.error(log);
 				break;
 			case 'warn':
-				res = this.logger.warn(log);
+				res = this.logger.warning(log);
 				break;
 			case 'verbose':
 				res = this.logger.verbose(log);

@@ -61,17 +61,17 @@ class TcpClient extends Client {
 			}
 		});
 		socket.on('timeout', function () {
-			self.logger.warn("Socket has timed out");
+			self.logger.warning("Socket has timed out");
 			self.emit('timeout');
 		});
 		// FIN packet
 		socket.on('end', function () {
-			self.logger.warn("Socket has ended");
+			self.logger.warning("Socket has ended");
 			self.emit('disconnect');
 		});
 		// fully closed
 		socket.on('close', function () {
-			self.logger.warn("Socket has closed");
+			self.logger.warning("Socket has closed");
 			self.emit('disconnect');
 		});
 		return this;
