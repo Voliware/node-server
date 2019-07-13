@@ -89,6 +89,10 @@ class HttpClient extends Client {
     onTimeout(){
 
     }
+
+    ping(){
+        
+    }
 }
 
 module.exports = HttpClient;

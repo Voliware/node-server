@@ -1,14 +1,11 @@
-const TcpServer = require('./tcp/tcpServer');
-const UdpServer = require('./udp/udpServer');
-const WebSocketServer = require('./webSocket/webSocketServer');
-const HttpServer = require('./http/httpServer');
+const NodeServer = require('./index');
 
 class AppExample {
     constructor(){
-        this.udpServer = new UdpServer({port: 9000});
-        this.tcpServer = new TcpServer({port: 666});
-        this.webSocketServer = new WebSocketServer({port: 1234});
-        this.httpServer = new HttpServer({port: 80});
+        this.udpServer = new NodeServer.UdpServer({port: 9000});
+        this.tcpServer = new NodeServer.TcpServer({port: 666});
+        this.webSocketServer = new NodeServer.WebSocketServer({port: 1234});
+        this.httpServer = new NodeServer.HttpServer({port: 80});
 
         // start
         this.udpServer.start();

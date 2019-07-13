@@ -93,8 +93,11 @@ class HttpServerListener extends ServerListener {
 			self.logger.error(error);
         });
         this.httpServer.on('connection', function(socket){
-            console.log(1)
-            self.createClient(socket);
+            let client = self.createClient(socket);
+            self.emit('connect', client);
+        });
+        this.httpServer.on('request', function(request, response){
+            self.emit('request', request, response);
         });
 		return this;
 	}

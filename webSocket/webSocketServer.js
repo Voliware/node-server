@@ -17,7 +17,6 @@ class WebSocketServer extends Server {
         let defaults = {
             logHandle: "WebSocketServer",
             type: "websocket",
-            port: options.port,
             message: JsonMessage
         };
         super(Object.extend(defaults, options));

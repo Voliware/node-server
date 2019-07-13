@@ -1,6 +1,6 @@
 {
   "name": "@voliware/node-server",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "author": "Anthony Agostino",
   "description": "Node Server",
   "keywords": [
@@ -16,6 +16,7 @@
     "@voliware/logger": "^1.2.1",
     "find-my-way": "^2.1.0",
     "microtime": "^2.1.8",
+    "mime-types": "^2.1.24",
     "ws": "^4.0.0"
   },
   "devDependencies": {},

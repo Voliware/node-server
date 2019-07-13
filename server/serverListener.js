@@ -1,7 +1,6 @@
 const EventEmitter = require('events').EventEmitter;
 const Logger = require('@voliware/logger');
 
-
 /**
  * An abstract server connection listener.
  * A server connection listener is some object that listens on 

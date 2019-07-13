@@ -588,13 +588,12 @@ class Server extends EventEmitter {
         if(message.isDone()){
             return this;
         }
-		let responseMessage = null;
 		let route = this.router.get(message.route);
 		if(route){
-			responseMessage = route(message, client);
-		}
-		if(responseMessage){
-			client.writeMessage(responseMessage);
+			let responseMessage = route(message, client);
+            if(responseMessage){
+                client.writeMessage(responseMessage);
+            }
 		}
 		return this;
 	}
