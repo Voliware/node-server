@@ -92,6 +92,9 @@ if(typeof Object.extend != 'function'){
 		for(let i = 1; i < arguments.length; i++){
 			for(let key in arguments[i]){
 				if(arguments[i].hasOwnProperty(key)) { 
+                    if(!arguments[0]){
+                        continue;
+                    }
 					if (typeof arguments[0][key] === 'object' && typeof arguments[i][key] === 'object') {
 						Object.extend(arguments[0][key], arguments[i][key]);
 					}

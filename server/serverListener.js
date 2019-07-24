@@ -1,5 +1,6 @@
 const EventEmitter = require('events').EventEmitter;
 const Logger = require('@voliware/logger');
+const ClientManager = require('./../client/clientManager');
 
 /**
  * An abstract server connection listener.
@@ -13,6 +14,12 @@ const Logger = require('@voliware/logger');
  * It must emit the following listener events
  * - connect(socket, data)
  * - disconnect(code, reason)
+ * The ServerListener comes with a ClientManager, but 
+ * it may or may not be needed. It is needed in use-cases
+ * like UDP client management, where the client connection
+ * opens and closes for each message, and is not persistent.
+ * It is also needed for HTTP clients who will connect from
+ * a different port for every HTTP request.
  * @extends {EventEmitter}
  */
 class ServerListener extends EventEmitter {
@@ -34,6 +41,7 @@ class ServerListener extends EventEmitter {
 		this.host = options.host || "localhost";
         this.port = options.port || 1337;
         this.clientOptions = options.clientOptions || {};
+		this.clientManager = new ClientManager();
         this.maxErrors = isNaN(options.maxError) ? 10 : options.maxError;
         this.logger = new Logger(options.logHandle || this.host, this);
         return this;
@@ -67,6 +75,16 @@ class ServerListener extends EventEmitter {
     createClient(socket, options = {}, data){
         throw new Error("createClient must be implemented");
     }
+
+	/**
+	 * Set the ClientManager.
+	 * @param {ClientManager} clientManager 
+	 * @return {ServerListener}
+	 */
+	setClientManager(clientManager){
+		this.clientManager = clientManager;
+		return this;
+	}
 }
 
 module.exports = ServerListener

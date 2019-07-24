@@ -62,6 +62,7 @@ class UdpClient extends Client {
 			self.emit('error', error);
 			self.errorCount++;
 			if(self.errorCount >= self.maxErrorCount){
+                self.logger.error("Socket reached max errors");
 				self.emit('maxError');
 			}
 		});
@@ -70,11 +71,11 @@ class UdpClient extends Client {
 			self.emit('timeout');
 		});
 		socket.on('end', function(){
-			self.logger.warning("Socket has ended");
+			self.logger.info("Socket has ended");
 			self.emit('disconnect');
 		});
 		socket.on('close', function(){
-			self.logger.warning("Socket has closed");
+			self.logger.info("Socket has closed");
 			self.emit('disconnect');
 		});
 		return this;

@@ -20,14 +20,17 @@ class HttpServer extends Server {
      */
     constructor(options = {}){
         let defaults = {
-            logHandle: "HttpServer",
             type: "http",
-            publicPath: "public"
+            publicPath: "public",
+            publicIndex: "index.html"
         };
         super(Object.extend(defaults, options));
         this.publicPath = Path.join(__dirname, '..', defaults.publicPath);
-        this.staticFiles = new Map();
-        this.findStaticFiles(this.publicPath);
+        this.publicIndex = defaults.publicIndex;
+        this.publicFiles = new Map();
+        this.findPublicFiles(this.publicPath);
+        // todo: this needs to be done in a more intuitive way
+        this.serverListener.setClientManager(this.clientManager);
         return this;
     }
 
@@ -63,7 +66,7 @@ class HttpServer extends Server {
      * @param {Response} response 
      * @return {HttpServer}
      */
-    staticFileResponse(filepath, response){
+    publicFileResponse(filepath, response){
         let self = this;
         Fs.readFile(filepath, function(err, file){
             if(err) {
@@ -87,7 +90,7 @@ class HttpServer extends Server {
      */
     fileExists(filepath){
         return new Promise(function(resolve, reject){
-            Fs.access(filepath, function(err){
+            return Fs.access(filepath, function(err){
                 resolve(!err);
             });
         });
@@ -115,10 +118,10 @@ class HttpServer extends Server {
      * @param {string} path 
      * @return {HttpServer}
      */
-    findStaticFiles(path){
+    findPublicFiles(path){
         let self = this;
         let directories = [];
-        this.addStaticFile("/", Path.join(this.publicPath, "index.html"));
+        this.addPublicFile("/", Path.join(this.publicPath, this.publicIndex));
         while(true){
             let files = Fs.readdirSync(path);
 
@@ -132,7 +135,7 @@ class HttpServer extends Server {
                     self.logger.debug("Registered file " + file);
                     let url = filepath.replace(self.publicPath, "");
                     url = url.replace(new RegExp("\\\\", 'g'), "/");
-                    self.addStaticFile(url, filepath);
+                    self.addPublicFile(url, filepath);
                 }
             }
 
@@ -149,15 +152,15 @@ class HttpServer extends Server {
     }
 
     /**
-     * Add a static file to the staticFiles
+     * Add a static file to the publicFiles
      * map where the key is the URL request
      * and the value is the full filepath.
      * @param {string} url - url request, eg /js/app.js
      * @param {string} filepath - file path, eg C:/webserver/js/app.js
      * @return {HttpServer}
      */
-    addStaticFile(url, filepath){
-        this.staticFiles.set(url, filepath);
+    addPublicFile(url, filepath){
+        this.publicFiles.set(url, filepath);
         return this;
     }
 
@@ -168,11 +171,11 @@ class HttpServer extends Server {
      * @param {string} url 
      * @return {null|string} filepath or null if not found
      */
-    async findStaticFile(url){
+    async findPublicFile(url){
         let filepath = Path.join(this.publicPath, url);
         let exists = await this.fileExists(filepath);
         if(exists){
-            this.addStaticFile(url, filepath);
+            this.addPublicFile(url, filepath);
             return filepath;
         }
         return null;
@@ -184,10 +187,10 @@ class HttpServer extends Server {
      * @param {string} url 
      * @return {null|string}
      */
-    async getStaticFile(url){
-        let filepath = this.staticFiles.get(url);
+    async getPublicFile(url){
+        let filepath = this.publicFiles.get(url);
         if(!filepath){
-            filepath = await this.findStaticFile(url);
+            filepath = await this.findPublicFile(url);
         }
         return filepath || null;
     }
@@ -198,13 +201,13 @@ class HttpServer extends Server {
      * @param {Response} response 
      * @return {HttpServer}
      */
-    async routeStaticFile(request, response){
-        let filepath = await this.getStaticFile(request.url);
+    async routePublicFile(request, response){
+        let filepath = await this.getPublicFile(request.url);
         if(!filepath){
-            filepath = await this.findStaticFile(request.url);
+            filepath = await this.findPublicFile(request.url);
         }
         if(filepath){
-            return this.staticFileResponse(filepath, response);
+            return this.publicFileResponse(filepath, response);
         }
         else {
             return this.response404(response);
@@ -228,7 +231,7 @@ class HttpServer extends Server {
             return route(request, response);
         }
         else {
-            return this.routeStaticFile(request, response);
+            return this.routePublicFile(request, response);
         }
     }
 }

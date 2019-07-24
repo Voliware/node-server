@@ -2,7 +2,6 @@ const dgram = require('dgram');
 const ServerListener = require ('../server/serverListener');
 const UdpClient = require('./udpClient');
 const UdpSocket = require('./udpSocket');
-const ClientManager = require('./../client/clientManager');
 
 /**
  * UDP ServerListener
@@ -18,20 +17,6 @@ class UdpServerListener extends ServerListener {
 	constructor(options){
         let defaults = {name: "UdpServerListener"};
 		super(Object.extend(defaults, options));
-		// we need a client manager to track unique clients
-		// otherwise we would be creating a new UdpClient
-		// on every single message
-		this.clientManager = new ClientManager();
-		return this;
-	}
-
-	/**
-	 * Set the ClientManager.
-	 * @param {ClientManager} clientManager 
-	 * @return {UdpServerListener}
-	 */
-	setClientManager(clientManager){
-		this.clientManager = clientManager;
 		return this;
 	}
 

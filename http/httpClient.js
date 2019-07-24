@@ -15,83 +15,132 @@ class HttpClient extends Client {
     constructor(socket, options = {}){
         let defaults = {logHandle: "HttpClient"};
         super(socket, Object.extend(defaults, options));
+        this.logger.setLogLevel("debug");
+        this.sockets = 0;
+        return this;
+    }
+
+    incrementSocketCount(socket){
+        this.sockets++;
+        return this;
+    }
+
+    decrementSocketCount(){
+        this.sockets--;
+        return this;
+    }
+
+    checkSocketCount(){
+        if(!this.sockets){
+            this.emit('disconnected');
+            this.logger.info("Disconnected");
+        }
         return this;
     }
 
     /**
      * Attach handlers to the socket.
-     * - reconnect
-     * - disconnect
-     * - message
+     * - close
+     * - connect
+     * - data
+     * - drain
+     * - end
      * - error
-     * - maxError
-     * - ping
-     * - pong
+     * - drain
+     * - lookup
+     * - ready
+     * - timeout
      * @param {*} socket
      * @return {Client}
-     */
+     */ 
     attachSocketHandlers(socket){
-        socket.on('close', this.onClose.bind(this));
-        socket.on('connect', this.onConnect.bind(this));
-        socket.on('data', this.onData.bind(this));
-        socket.on('drain', this.onDrain.bind(this));
-        socket.on('end', this.onEnd.bind(this));
-        socket.on('error', this.onError.bind(this));
-        socket.on('drain', this.onDrain.bind(this));
-        socket.on('lookup', this.onLookup.bind(this));
-        socket.on('ready', this.onReady.bind(this));
-        socket.on('timeout', this.onTimeout.bind(this));
+        let self = this;
+        socket.on('close', function(hadError){
+            self.onClose(socket, hadError);
+            self.decrementSocketCount();
+            self.checkSocketCount();
+        });
+        socket.on('connect', function(){
+            self.onConnect(socket);
+        });
+        socket.on('data', function(data){
+            self.onData(socket, data);
+        });
+        socket.on('drain', function(){
+            self.onDrain(socket);
+        });
+        socket.on('end', function(){
+            self.onEnd(socket);
+        });
+        socket.on('error', function(error){
+            self.onError(socket, error);
+        });
+        socket.on('lookup', function(error){
+            self.onLookup(socket, error, address, family, host);
+        });
+        socket.on('ready', function(){
+            self.onReady(socket);
+        });
+        socket.on('timeout', function(){
+            self.onTimeout(socket);
+        });
         return this;
     }
 
-    onClose(hadError){
-        this.logger.debug("Client closed" + (hadError ? " with an error " : ""));
+    onClose(socket, hadError){
+        this.logger.debug(`Socket[${socket.remotePort}] closed ${hadError ? "with an error"  : ""}`);
         return this;
     }
 
-    onConnect(){
-        this.logger.debug("Client connected");
+    onConnect(socket){
+        this.logger.debug(`Socket[${socket.remotePort}] connected`);
         return this;
     }
 
-    onData(data){
-        this.logger.debug("Client data");
+    onData(socket, data){
+        this.logger.debug(`Socket[${socket.remotePort}] data`);
         this.logger.debug(data);
         return this;
     }
 
-    onDrain(){
-        this.logger.debug("Client drain");
+    onDrain(socket){
+        this.logger.debug(`Socket[${socket.remotePort}] drain`);
         return this;
     }
 
-    onEnd(){
-        this.logger.debug("Client drain");
+    onEnd(socket){
+        this.logger.debug(`Socket[${socket.remotePort}] end`);
         return this;
     }
 
-    onError(error){
-        this.logger.debug("Client error");
+    onError(socket, error){
+        this.logger.debug(`Socket[${socket.remotePort}] error`);
         this.logger.debug(error);
         return this;
     }
 
-    onLookup(error){
-        this.logger.debug("Client lookup");
-        this.logger.debug(error, address, family, host);
+    onLookup(socket, error, address, family, host){
+        this.logger.debug(`Socket[${socket.remotePort}] lookup`);
+        this.logger.debug(error);
+        this.logger.debug(`address: ${address}, family: ${family}, host: ${host}`);
         return this;
     }
 
-    onReady(){
-
+    onReady(socket){
+        this.logger.debug(`Socket[${socket.remotePort}] ready`);
+        return this;
     }
 
-    onTimeout(){
-
+    onTimeout(socket){
+        this.logger.debug(`Socket[${socket.remotePort}] timeout`);
+        return this;
     }
 
+    /**
+     * Do not do anything on pings/pongs
+     */
     ping(){
-        
+        return this;
     }
 }
 

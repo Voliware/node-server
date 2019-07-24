@@ -93,8 +93,16 @@ class HttpServerListener extends ServerListener {
 			self.logger.error(error);
         });
         this.httpServer.on('connection', function(socket){
-            let client = self.createClient(socket);
-            self.emit('connect', client);
+            let clientName = socket.remoteAddress;
+			let client = self.clientManager.getClient(clientName);
+			if(client){
+				client.attachSocketHandlers(socket);
+				client.incrementSocketCount();
+			}
+			else {
+				client = self.createClient(socket);
+				self.emit('connect', client);
+			}
         });
         this.httpServer.on('request', function(request, response){
             self.emit('request', request, response);
@@ -168,7 +176,7 @@ class HttpServerListener extends ServerListener {
 	 * @return {HttpClient}
 	 */
 	createClient(socket, options, connectData){
-		let id = `@${socket.remoteAddress}:${socket.remotePort}`;
+		let id = socket.remoteAddress;
 		let defaults = {
 			name: "HttpClient"+id,
 			id: id,

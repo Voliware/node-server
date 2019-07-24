@@ -58,7 +58,7 @@ class WebSocketClient extends Client {
         socket.on('open', function(data){
 			self.logger.debug(`Connected:`);
 			self.logger.debug(data);
-            self.emit('connect', data);
+            self.emit('open', data);
             setTimeout(function(){
                 self.ping();
             }, 1000);
@@ -77,19 +77,20 @@ class WebSocketClient extends Client {
         // on error, increase the max error count
         // if max error is hit, emit maxError event
 		socket.on('error', function(error){
-			self.logger.error("Error:");
+			self.logger.error("Socket error:");
 			self.logger.error(error);
             self.emit('error', error);
 			self.errorCount++;
 			if(self.errorCount >= self.maxErrorCount){
 				self.emit('maxError');
+                self.logger.error("Socket reached max errors");
 			}
         });
 
         // on close, emit disconnect
 		socket.on('close', function(code, reason){
             self.logger.debug(`Websocket closed with code: ${code}, reason: ${reason ? reason : "none"}`);
-            self.emit('disconnect', code, reason);
+            self.emit('disconnect', {code, reason});
 		});
 		return this;
 	}

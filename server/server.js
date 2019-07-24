@@ -90,7 +90,7 @@ class Server extends EventEmitter {
         };
 
         // components
-        this.logger = new Logger(options.logHandle || this.name, this);
+        this.logger = new Logger(options.logHandle || this.name, {context: this});
 		this.clientManager = this.createClientManager({maxClients: this.maxClients});
 		this.roomManager = this.createRoomManager({maxRooms: this.maxRooms});
 		this.router = options.router || new Map();
@@ -201,6 +201,7 @@ class Server extends EventEmitter {
 
 	/**
 	 * Handle a connection from a new Client.
+     * Emit a "connect" event with the client.
 	 * @param {Client} client 
 	 * @param {*} connectData 
 	 * @return {Server}
@@ -211,25 +212,44 @@ class Server extends EventEmitter {
 		}
 
 		this.attachClientHandlers(client);
-		this.clientManager.addClient(client.id, client);
+        this.clientManager.addClient(client.id, client);
+        this.emit('connect', client);
 		client.ping();
 		return this;
 	}
     
     /**
-     * Attach handlers to a Client
+     * Attach all handlers to a Client
+     * - disconnect
+     * - reconnect
+     * - timeout
+     * - message
+     * - error
+     * - maxError
      * @param {Client} client 
      * @return {Server}
      */
     attachClientHandlers(client){
 		let self = this;
+		client.on('disconnnect', function(data){
+            self.emit('disconnnect', client, data);
+		});
+		client.on('reconnnect', function(){
+            self.emit('reconnnect', client);
+		});
+		client.on('timeout', function(){
+            self.emit('timeout', client);
+		});
 		client.on('message', function(message){
-			self.routeMessage(message, client);
+            self.routeMessage(message, client);
+            self.emit('message', client, message);
 		});
 		client.on('error', function(error){
-			self.logger.error("Client error:");
-			self.logger.error(error);
-		})
+            self.emit('error', client, error);
+		});
+		client.on('maxError', function(error){
+            self.emit('maxError', client, error);
+		});
         return this;
     }
 
