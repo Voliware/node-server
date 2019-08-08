@@ -93,7 +93,7 @@ class Server extends EventEmitter {
         this.logger = new Logger(options.logHandle || this.name, {context: this});
 		this.clientManager = this.createClientManager({maxClients: this.maxClients});
 		this.roomManager = this.createRoomManager({maxRooms: this.maxRooms});
-		this.router = options.router || new Map();
+        this.router = options.router || new Map();
 
 		// set the log handle of each component to the same name of the server
 		this.serverListener.logger.setName(this.name).setContext(this.serverListener);
@@ -304,6 +304,47 @@ class Server extends EventEmitter {
     }
 
     /**
+     * Add a route to the router
+     * @param {string} route 
+     * @param {function} handler - function to handle the route
+     * @return {Server}
+     */
+    addRoute(route, handler){
+        this.router.set(route, handler);
+        return this;
+    }
+
+    /**
+     * Get a route callback from the router
+     * @param {string} route 
+     * @return {function}
+     */
+    getRoute(route){
+        return this.router.get(route);
+    }
+
+    /**
+     * Delete a route from the router.
+     * @param {string} route 
+     * @return {Server}
+     */
+    deleteRoute(route){
+        this.router.delete(route);
+        return this;
+    }
+
+    /**
+     * Print out all routes
+     * @return {Server}
+     */
+    printRoutes(){
+        for(let k in this.router){
+            console.log(k);
+        }
+        return this;
+    }
+
+    /**
      * Add the default routes to the router map.
      * @return {Server}
      */
@@ -474,9 +515,12 @@ class Server extends EventEmitter {
         }
         // get all rooms
         else {
-            let max = isNaN(message.data.max) ? 25 : message.data.max;
-            let offset = isNaN(message.data.offset) ? 0 : message.data.offset;
-            msg.setData(this.roomManager.serialize(max, offset));
+            let options = {
+                max: 25,
+                offset: 0
+            };
+            Object.assign(options, message.data);
+            msg.setData(this.roomManager.serialize(options.max, options.offset));
         }
 
         return msg;

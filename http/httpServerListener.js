@@ -105,6 +105,7 @@ class HttpServerListener extends ServerListener {
 			}
         });
         this.httpServer.on('request', function(request, response){
+            self.logger.debug(`Requested method: ${request.method} of ${request.url}`);
             self.emit('request', request, response);
         });
 		return this;

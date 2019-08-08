@@ -16,20 +16,36 @@ class HttpClient extends Client {
         let defaults = {logHandle: "HttpClient"};
         super(socket, Object.extend(defaults, options));
         this.logger.setLogLevel("debug");
+
+        // number of connected sockets this client is using
         this.sockets = 0;
         return this;
     }
 
-    incrementSocketCount(socket){
+    /**
+     * Increment the connected socket count.
+     * @return {HttpClient}
+     */
+    incrementSocketCount(){
         this.sockets++;
         return this;
     }
 
+    /**
+     * Decrement the connected socket count.
+     * @return {HttpClient}
+     */
     decrementSocketCount(){
         this.sockets--;
         return this;
     }
 
+    /**
+     * Check the connected socket count.
+     * If there are 0 connected sockets,
+     * emit the "disconnect" event. 
+     * @return {HttpClient}
+     */
     checkSocketCount(){
         if(!this.sockets){
             this.emit('disconnected');
@@ -87,52 +103,103 @@ class HttpClient extends Client {
         return this;
     }
 
+    /**
+     * Socket "close" event handler
+     * @param {Socket} socket 
+     * @param {boolean} hadError 
+     * @return {HttpClient}
+     */
     onClose(socket, hadError){
-        this.logger.debug(`Socket[${socket.remotePort}] closed ${hadError ? "with an error"  : ""}`);
+        this.logger.debug(`Socket ${socket.remotePort} closed ${hadError ? "with an error"  : ""}`);
         return this;
     }
 
+    /**
+     * Socket "connect" event handler
+     * @param {Socket} socket 
+     * @return {HttpClient}
+     */
     onConnect(socket){
-        this.logger.debug(`Socket[${socket.remotePort}] connected`);
+        this.logger.debug(`Socket ${socket.remotePort} connected`);
         return this;
     }
 
+    /**
+     * Socket "data" event handler
+     * @param {Socket} socket 
+     * @param {Buffer} data
+     * @return {HttpClient}
+     */
     onData(socket, data){
-        this.logger.debug(`Socket[${socket.remotePort}] data`);
-        this.logger.debug(data);
+        this.logger.debug(`Socket ${socket.remotePort} data`);
+        // this.logger.debug(data);
         return this;
     }
 
+    /**
+     * Socket "drain" event handler
+     * @param {Socket} socket 
+     * @return {HttpClient}
+     */
     onDrain(socket){
-        this.logger.debug(`Socket[${socket.remotePort}] drain`);
+        this.logger.debug(`Socket ${socket.remotePort} drain`);
         return this;
     }
 
+    /**
+     * Socket "connect" event handler
+     * @param {Socket} socket 
+     * @return {HttpClient}
+     */
     onEnd(socket){
-        this.logger.debug(`Socket[${socket.remotePort}] end`);
+        this.logger.debug(`Socket ${socket.remotePort} end`);
         return this;
     }
 
+    /**
+     * Socket "error" event handler
+     * @param {Socket} socket 
+     * @param {object} error
+     * @return {HttpClient}
+     */
     onError(socket, error){
-        this.logger.debug(`Socket[${socket.remotePort}] error`);
+        this.logger.debug(`Socket ${socket.remotePort} error`);
         this.logger.debug(error);
         return this;
     }
 
+    /**
+     * Socket "connect" event handler
+     * @param {Socket} socket 
+     * @param {object} error
+     * @param {string} family
+     * @param {string} host
+     * @return {HttpClient}
+     */
     onLookup(socket, error, address, family, host){
-        this.logger.debug(`Socket[${socket.remotePort}] lookup`);
+        this.logger.debug(`Socket ${socket.remotePort} lookup`);
         this.logger.debug(error);
         this.logger.debug(`address: ${address}, family: ${family}, host: ${host}`);
         return this;
     }
 
+    /**
+     * Socket "ready" event handler
+     * @param {Socket} socket 
+     * @return {HttpClient}
+     */
     onReady(socket){
-        this.logger.debug(`Socket[${socket.remotePort}] ready`);
+        this.logger.debug(`Socket ${socket.remotePort} ready`);
         return this;
     }
 
+    /**
+     * Socket "timeout" event handler
+     * @param {Socket} socket 
+     * @return {HttpClient}
+     */
     onTimeout(socket){
-        this.logger.debug(`Socket[${socket.remotePort}] timeout`);
+        this.logger.debug(`Socket ${socket.remotePort} timeout`);
         return this;
     }
 

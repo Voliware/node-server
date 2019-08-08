@@ -1,7 +1,9 @@
+const Querystring = require('query-string');
 const Server = require('../server/server');
 const Fs = require('fs');
 const Path = require('path');
 const Mime = require('mime-types');
+const Router = require('find-my-way');
 
 /**
  * HTTP Server.
@@ -20,15 +22,18 @@ class HttpServer extends Server {
      */
     constructor(options = {}){
         let defaults = {
+            name: "HttpServer",
             type: "http",
             publicPath: "public",
-            publicIndex: "index.html"
+            publicIndex: "index.html",
+            router: Router()
         };
         super(Object.extend(defaults, options));
         this.publicPath = Path.join(__dirname, '..', defaults.publicPath);
         this.publicIndex = defaults.publicIndex;
         this.publicFiles = new Map();
         this.findPublicFiles(this.publicPath);
+        this.router.defaultRoute = this.routePublicFile.bind(this);
         // todo: this needs to be done in a more intuitive way
         this.serverListener.setClientManager(this.clientManager);
         return this;
@@ -41,7 +46,6 @@ class HttpServer extends Server {
      */
     attachServerListenerHandlers(serverListener){
         super.attachServerListenerHandlers(serverListener);
-        
         let self = this;
         serverListener.on('request', function(request, response){
             self.routeRequest(request, response);
@@ -213,6 +217,150 @@ class HttpServer extends Server {
             return this.response404(response);
         }
     }
+    
+    /**
+     * Add a route to the router
+     * @param {string} method 
+     * @param {string} route 
+     * @param {function} handler - function to handle the route
+     * @return {HttpServer}
+     */
+    addRoute(method, route, handler){
+        method = method.toUpperCase();
+        let self = this;
+        this.router.on(method, route, function(request, response, params){
+            self.getRequestData(request)
+                .then(function(body){
+                    handler(request, response, {
+                        params: params,
+                        body: self.parseBody(body, request),
+                        query: self.parseQuery(request.url)
+                    });
+                })
+                .catch(function(error){
+                    console.log(error);
+                });
+        });
+        return this;
+    }
+
+    /**
+     * Get a route callback from the router
+     * @param {string} method 
+     * @param {string} route 
+     * @param {string} [version] 
+     * @return {function}
+     */
+    getRoute(method, route, version){
+        return this.router.find(method, route, version);
+    }
+
+    /**
+     * Delete a route from the router.
+     * @param {string} method 
+     * @param {string} route 
+     * @return {HttpServer}
+     */
+    deleteRoute(method, route){
+        this.router.off(method, route);
+        return this;
+    }
+
+    /**
+     * Print out all routes
+     * @return {HttpServer}
+     */
+    printRoutes(){
+        this.router.prettyPrint();
+        return this;
+    }
+    
+    /**
+     * Add the default routes to the router map.
+     * Override as to not add the default Server 
+     * routes which are not compatible.
+     * @return {HttpServer}
+     */
+	addDefaultRoutes(){
+		return this;
+    }
+
+    /**
+     * Parse a url for query parameters.
+     * @param {string} url 
+     * @return {object} object for each param, empty if none
+     */
+    parseQuery(url){
+        let index = url.indexOf('?');
+        let query = {};
+        if(index > -1){
+            let querystring = url.substr(index, url.length);
+            query = Querystring.parse(querystring);
+        }
+        return query;
+    }
+
+    /**
+     * Parse a string of data, aka "body",
+     * using the request headers to determine
+     * the type of data. Returns the best
+     * matching type of data based on 
+     * the Content-Type header.
+     * @param {string} body 
+     * @param {Request} request 
+     * @return {object|string}
+     */
+    parseBody(body, request){
+        let mime = Mime.extension(request.headers['content-type']);
+        switch(mime){
+            case "txt":
+                try {
+                    return JSON.parse(body);
+                }
+                catch(e){
+                    return {};
+                }
+            default:
+                return body;
+        }
+    }
+    
+    /**
+     * Get request data from an HTTP request.
+     * This returns a promise as data will
+     * come over the client socket over some
+     * period of time - ie it is not all 
+     * availalble immediately when the request
+     * is received.
+     * @param {Request} request 
+     * @return {Promise}
+     */
+    getRequestData(request){
+        return new Promise(function(resolve, reject){
+            let body = "";
+            request.on('data', function(data){
+                body += data.toString();
+            })
+            request.on('end', function(){
+                resolve(body);
+            });
+            request.on('error', function(error){
+                reject(error);
+            });
+        });
+    }
+
+    /**
+     * Override the client whisper handler
+     * to instead do nothing.
+     * @param {Message} message 
+     * @param {HttpClient} client 
+     * @return {null}
+     */
+    handleMessageClientWhisper(message, client){
+        console.log("Cannot whisper to HTTP clients");
+        return null;
+    }
 
     /**
      * Route a request.
@@ -225,14 +373,42 @@ class HttpServer extends Server {
      * @return {HttpServer}
      */
     routeRequest(request, response){
-        this.logger.info(`routeRequest: url is ${request.url}`);
-        let route = this.router.get(request.url);
-        if(route){
-            return route(request, response);
-        }
-        else {
-            return this.routePublicFile(request, response);
-        }
+        this.addJsonMethod(response);
+        this.router.lookup(request, response);
+        return this;
+    }
+
+    /**
+     * Add the JSON method to a response object
+     * which will stringify an object as the 
+     * data response, set the content type to
+     * application/json, and set the status code to 200.
+     * If the JSON cannot be stringified, the 
+     * status code will be set to 500.
+     * This ends the respnose.
+     * @param {Response} response 
+     */
+    addJsonMethod(response){
+        response.json = function(data){
+            let json = null;
+            try {
+                json = JSON.stringify(data);
+            }
+            catch (e){
+                console.error(e);
+            }
+            if(json){
+                response.statusCode = 200;
+                response.setHeader('Content-Type', 'application/json');
+                response.write(json);
+                response.end();
+            }
+            else {
+                response.statusCode = 500;
+                response.end();
+            }
+        };
+        return response;
     }
 }
 
