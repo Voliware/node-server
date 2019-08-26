@@ -1,6 +1,7 @@
 const Client = require('./client/client');
 const ClientManager = require('./client/clientManager');
 const HttpClient = require('./http/httpClient');
+const HttpRouter = require('find-my-way');
 const HttpServer = require('./http/httpServer');
 const HttpServerListener = require('./http/httpServerListener');
 const JsonMessage = require('./json/jsonMessage');
@@ -25,6 +26,7 @@ module.exports = {
     Client,
     ClientManager,
     HttpClient,
+    HttpRouter,
     HttpServer,
     HttpServerListener,
     JsonMessage,

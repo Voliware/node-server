@@ -1,6 +1,6 @@
 {
   "name": "@voliware/node-server",
-  "version": "1.2.0",
+  "version": "1.2.3",
   "author": "Anthony Agostino",
   "description": "Node Server",
   "keywords": [
@@ -11,7 +11,7 @@
     "udp",
     "http"
   ],
-  "main": "app.js",
+  "main": "index.js",
   "dependencies": {
     "@voliware/logger": "^1.4.1",
     "find-my-way": "^2.1.0",

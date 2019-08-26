@@ -1,5 +1,8 @@
 class App {
     constructor(){
+        this.elements = {
+            status: Template.select("#status")
+        };
         this.getVersion();
         this.getStatus();
         return this;
@@ -17,7 +20,7 @@ class App {
     }
 
     renderStatus(status){
-
+        this.elements.status.render({status});
         return this;
     }
 
@@ -33,7 +36,7 @@ class App {
     }
 
     renderVersion(version){
-
+        this.elements.status.render({version});
         return this;
     }
 }

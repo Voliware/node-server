@@ -22,14 +22,15 @@ class HttpServer extends Server {
      */
     constructor(options = {}){
         let defaults = {
+            port: 80,
             name: "HttpServer",
             type: "http",
-            publicPath: "public",
+            publicPath: Path.join(__dirname, '..', "public"),
             publicIndex: "index.html",
             router: Router()
         };
         super(Object.extend(defaults, options));
-        this.publicPath = Path.join(__dirname, '..', defaults.publicPath);
+        this.publicPath = defaults.publicPath;
         this.publicIndex = defaults.publicIndex;
         this.publicFiles = new Map();
         this.findPublicFiles(this.publicPath);
@@ -56,19 +57,19 @@ class HttpServer extends Server {
     /**
      * Createa and send 404 not found response.
      * @param {Response} response 
-     * @return {HttpServer}
+     * @return {Response}
      */
     response404(response){
         response.statusCode = 404;
         response.end();
-        return this;
+        return response;
     }
 
     /**
      * Create a response with a static resource.
      * @param {string} filepath 
      * @param {Response} response 
-     * @return {HttpServer}
+     * @return {Response}
      */
     publicFileResponse(filepath, response){
         let self = this;
@@ -82,7 +83,7 @@ class HttpServer extends Server {
                 response.statusCode = 200;
                 response.write(file);
                 response.end();
-                return this;
+                return response;
             }
         });
     }
@@ -239,6 +240,7 @@ class HttpServer extends Server {
                 })
                 .catch(function(error){
                     console.log(error);
+                    handler(request, response, {});
                 });
         });
         return this;
