@@ -1,5 +1,6 @@
 const EventEmitter = require('events').EventEmitter;
 const Message = require ('../message/message');
+const JsonMessage = require ('../json/jsonMessage');
 const ServerListener = require ('./serverListener');
 const ServerMonitor = require('./serverMonitor');
 const Client = require('./../client/client');
@@ -30,7 +31,7 @@ class Server extends EventEmitter {
      * @param {string} [options.type="websocket"] - the server type
      * @param {string} [options.data="buffer"] - for tcp/udp, what format to send/receive data in, ie buffer or string.
      *                 For Websocket, this is not relevant.
-     * @param {Message} [options.message=Message] - the type of message to use
+     * @param {Message} [options.message=JsonMessage] - the type of message to use
      * @param {number} [options.maxErrors=0] - max num of errors the server can tolerate, or 0 for no max
      * @param {number} [options.maxClients=0] - max num of clients, or 0 for no max
      * @param {number} [options.maxClientErrors=0] - how many errors a client can have before disconnecting it
@@ -54,7 +55,7 @@ class Server extends EventEmitter {
 		this.port = options.port || 3000;
         this.type = options.type || "websocket";
         this.data = options.data || "buffer";
-        this.message = options.message || Message;
+        this.message = options.message || JsonMessage;
         this.maxErrors = options.maxErrors || 0;
         this.maxClients = options.maxClients || 0;
         this.maxClientErrors = options.maxClientErrors || 0;
