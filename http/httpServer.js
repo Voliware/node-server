@@ -1,9 +1,45 @@
+const ServerResponse = require('http').ServerResponse;
 const Querystring = require('query-string');
 const Server = require('../server/server');
 const Fs = require('fs');
 const Path = require('path');
 const Mime = require('mime-types');
 const Router = require('find-my-way');
+
+if(typeof ServerResponse.prototype.json === "undefined") {
+
+    /**
+     * Add the JSON method to a response object
+     * which will stringify an object as the 
+     * data response, set the content type to
+     * application/json, and set the status code to 200.
+     * If the JSON cannot be stringified, the 
+     * status code will be set to 500.
+     * This ends the respnose.
+     * @param {object} response 
+     * @return {Response}
+     */
+    ServerResponse.prototype.json = function(data){
+        let json = null;
+        try {
+            json = JSON.stringify(data);
+        }
+        catch (e){
+            console.error(e);
+        }
+        if(json){
+            this.statusCode = 200;
+            this.setHeader('Content-Type', 'application/json');
+            this.write(json);
+            this.end();
+        }
+        else {
+            this.statusCode = 500;
+            this.end();
+        }
+        return this;
+    };
+}
 
 /**
  * HTTP Server.
@@ -375,42 +411,8 @@ class HttpServer extends Server {
      * @return {HttpServer}
      */
     routeRequest(request, response){
-        this.addJsonMethod(response);
         this.router.lookup(request, response);
         return this;
-    }
-
-    /**
-     * Add the JSON method to a response object
-     * which will stringify an object as the 
-     * data response, set the content type to
-     * application/json, and set the status code to 200.
-     * If the JSON cannot be stringified, the 
-     * status code will be set to 500.
-     * This ends the respnose.
-     * @param {Response} response 
-     */
-    addJsonMethod(response){
-        response.json = function(data){
-            let json = null;
-            try {
-                json = JSON.stringify(data);
-            }
-            catch (e){
-                console.error(e);
-            }
-            if(json){
-                response.statusCode = 200;
-                response.setHeader('Content-Type', 'application/json');
-                response.write(json);
-                response.end();
-            }
-            else {
-                response.statusCode = 500;
-                response.end();
-            }
-        };
-        return response;
     }
 }
 
