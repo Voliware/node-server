@@ -1,7 +1,7 @@
 class App {
     constructor(){
         this.elements = {
-            status: Template.select("#status")
+            status: Template.selectFirst("#status")
         };
         this.getVersion();
         this.getStatus();

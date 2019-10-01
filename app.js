@@ -1,7 +1,18 @@
 const NodeServer = require('./index');
+const version = require('./package.json').version;
 
+/**
+ * App example
+ */
 class AppExample {
+
+    /**
+     * Constructor
+     * @return {AppExample}
+     */
     constructor(){
+        let self = this;
+
         this.webSocketServer = new NodeServer.WebSocketServer({port: 1234});
         this.httpServer = new NodeServer.HttpServer({port: 80});
         this.tcpServer = new NodeServer.TcpServer({port: 666});
@@ -9,10 +20,10 @@ class AppExample {
 
         // http routes
         this.httpServer.addRoute('GET', '/status', function(req, res){
-            res.json({status:"Online"});
+            self.httpServer.sendJson(res, {status:"Online"});
         });
         this.httpServer.addRoute('GET', '/version', function(req, res){
-            res.json({version:AppExample.VERSION});
+            self.httpServer.sendJson(res, {version});
         });
 
         // start
@@ -24,6 +35,5 @@ class AppExample {
         return this;
     }
 }
-AppExample.VERSION = "1.0.0";
 
 module.exports = new AppExample();

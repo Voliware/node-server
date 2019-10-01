@@ -43,8 +43,8 @@ class BufferJsonMessage extends JsonMessage {
      */
     toJsonBuffer(){
         let string = this.toJsonString();
-        string += this.eof;
         if(string){
+            string += this.eof;
             return Buffer.from(string, this.encoding);
         }
         return null;

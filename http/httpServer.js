@@ -1,45 +1,10 @@
-const ServerResponse = require('http').ServerResponse;
 const Querystring = require('query-string');
 const Server = require('../server/server');
 const Fs = require('fs');
 const Path = require('path');
 const Mime = require('mime-types');
 const Router = require('find-my-way');
-
-if(typeof ServerResponse.prototype.json === "undefined") {
-
-    /**
-     * Add the JSON method to a response object
-     * which will stringify an object as the 
-     * data response, set the content type to
-     * application/json, and set the status code to 200.
-     * If the JSON cannot be stringified, the 
-     * status code will be set to 500.
-     * This ends the respnose.
-     * @param {object} response 
-     * @return {Response}
-     */
-    ServerResponse.prototype.json = function(data){
-        let json = null;
-        try {
-            json = JSON.stringify(data);
-        }
-        catch (e){
-            console.error(e);
-        }
-        if(json){
-            this.statusCode = 200;
-            this.setHeader('Content-Type', 'application/json');
-            this.write(json);
-            this.end();
-        }
-        else {
-            this.statusCode = 500;
-            this.end();
-        }
-        return this;
-    };
-}
+const UserAgent = require('useragent');
 
 /**
  * HTTP Server.
@@ -99,6 +64,55 @@ class HttpServer extends Server {
         response.statusCode = 404;
         response.end();
         return response;
+    }
+
+    /**
+     * Stringify an object as the 
+     * data response, set the content type to
+     * application/json, and set the status code to 200.
+     * If the JSON cannot be stringified, the 
+     * status code will be set to 500.
+     * This ends the respnose.
+     * @param {object} response 
+     * @param {object} data
+     * @return {Response}
+     */
+    sendJson(response, data){
+        try {
+            let json = JSON.stringify(data);
+            response.statusCode = 200;
+            response.setHeader('Content-Type', 'application/json');
+            response.write(json);
+            response.end();
+        }
+        catch (e){
+            console.error(e);
+            response.statusCode = 500;
+            response.end();
+        }
+        return response;
+    };
+    
+    /**
+     * Get the client's IP from a request.
+     * https://stackoverflow.com/questions/8107856/how-to-determine-a-users-ip-address-in-node
+     * @param {object} request
+     * @return {string}
+     */
+    getClientIp(request){
+        return (request.headers['x-forwarded-for'] || '').split(',').pop() || 
+            request.connection.remoteAddress || 
+            request.socket.remoteAddress || 
+            request.connection.socket.remoteAddress;
+    }
+
+    /**
+     * Get the client's browser from a request.
+     * @param {object} request 
+     * @return {object}
+     */
+    getClientBrowser(request){
+        return UserAgent.lookup(request.headers['user-agent']);
     }
 
     /**
