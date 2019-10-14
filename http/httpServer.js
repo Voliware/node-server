@@ -174,7 +174,6 @@ class HttpServer extends Server {
      * @return {HttpServer}
      */
     findPublicFiles(path){
-        let self = this;
         let directories = [];
         this.addPublicFile("/", Path.join(this.publicPath, this.publicIndex));
         while(true){
@@ -183,14 +182,14 @@ class HttpServer extends Server {
             for(let i = 0; i < files.length; i++){
                 let file = files[i];
                 let filepath = Path.join(path, file);
-                if(self.isDirectory(filepath)){
+                if(this.isDirectory(filepath)){
                     directories.push(filepath);
                 }
                 else{
-                    self.logger.debug("Registered file " + file);
-                    let url = filepath.replace(self.publicPath, "");
+                    this.logger.debug("Registered file " + file);
+                    let url = filepath.replace(this.publicPath, "");
                     url = url.replace(new RegExp("\\\\", 'g'), "/");
-                    self.addPublicFile(url, filepath);
+                    this.addPublicFile(url, filepath);
                 }
             }
 

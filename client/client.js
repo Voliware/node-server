@@ -72,7 +72,10 @@ class Client extends EventEmitter {
         this.latency = 0;
         this.timeout = 0;
         this.connectData = options.connectData || null;
-        this.logger = new Logger(options.logHandle || this.name, this);
+        this.logger = new Logger(options.logHandle || this.name, {
+            level: "debug",
+            context: this
+        });
 
         // heartbeat
         this.heartbeatInterval = null;

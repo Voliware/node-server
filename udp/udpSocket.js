@@ -20,7 +20,10 @@ class UdpSocket extends EventEmitter {
         this.address = address;
         this.port = port;
         this.socket = dgram.createSocket('udp4');
-        this.logger = new Logger(options.logHandle || "UdpSocket", this);
+        this.logger = new Logger(options.logHandle || "UdpSocket", {
+            level: "debug",
+            context: this
+        });
         return this;
     }
 
