@@ -22,7 +22,7 @@ class UdpSocket extends EventEmitter {
         this.socket = dgram.createSocket('udp4');
         this.logger = new Logger(options.logHandle || "UdpSocket", {
             level: "debug",
-            context: this
+            context: this.constructor.name
         });
         return this;
     }

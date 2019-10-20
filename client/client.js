@@ -74,7 +74,7 @@ class Client extends EventEmitter {
         this.connectData = options.connectData || null;
         this.logger = new Logger(options.logHandle || this.name, {
             level: "debug",
-            context: this
+            context: this.constructor.name
         });
 
         // heartbeat

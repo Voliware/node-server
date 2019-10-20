@@ -16,6 +16,7 @@ class UdpServer extends Server {
     constructor(options = {}){
         let defaults = {
             logHandle: "UdpServer",
+            name: "UdpServer",
             type: "udp",
             port: options.port,
             message: BufferJsonMessage

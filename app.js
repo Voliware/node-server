@@ -13,7 +13,7 @@ class AppExample {
     constructor(){
         let self = this;
 
-        this.webSocketServer = new NodeServer.WebSocketServer({port: 1234});
+        this.webSocketServer = new NodeServer.WebSocketServer({port: 2234});
         this.httpServer = new NodeServer.HttpServer({port: 80});
         this.tcpServer = new NodeServer.TcpServer({port: 666});
         this.udpServer = new NodeServer.UdpServer({port: 9000});

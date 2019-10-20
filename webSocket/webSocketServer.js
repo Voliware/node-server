@@ -15,6 +15,7 @@ class WebSocketServer extends Server {
      */
     constructor(options = {}){
         let defaults = {
+            name: "WebSocketServer",
             logHandle: "WebSocketServer",
             type: "websocket",
             message: JsonMessage

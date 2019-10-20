@@ -15,6 +15,7 @@ class TcpServer extends Server {
      */
     constructor(options = {}){
         let defaults = {
+            name: "TcpServer",
             logHandle: "TcpServer",
             type: "tcp",
             port: options.port,

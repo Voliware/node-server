@@ -45,7 +45,7 @@ class ServerListener extends EventEmitter {
         this.maxErrors = isNaN(options.maxError) ? 10 : options.maxError;
         this.logger = new Logger(options.logHandle || this.host, {
             level: "debug",
-            context: this
+            context: this.constructor.name
         });
         return this;
     }

@@ -25,6 +25,7 @@ class HttpServer extends Server {
         let defaults = {
             port: 80,
             name: "HttpServer",
+            logHandle: "HttpServer",
             type: "http",
             publicPath: Path.join(__dirname, '..', "public"),
             publicIndex: "index.html",
@@ -56,12 +57,12 @@ class HttpServer extends Server {
     }
 
     /**
-     * Createa and send 404 not found response.
+     * Set a status code and end the response
      * @param {Response} response 
      * @return {Response}
      */
-    response404(response){
-        response.statusCode = 404;
+    sendStatusCode(response, statusCode){
+        response.statusCode = statusCode;
         response.end();
         return response;
     }
@@ -85,8 +86,8 @@ class HttpServer extends Server {
             response.write(json);
             response.end();
         }
-        catch (e){
-            console.error(e);
+        catch (error){
+            this.logger.error(error);
             response.statusCode = 500;
             response.end();
         }
@@ -125,7 +126,7 @@ class HttpServer extends Server {
         let self = this;
         Fs.readFile(filepath, function(err, file){
             if(err) {
-                return self.response404(response);
+                return self.sendStatusCode(response, 404);
             };
             if(file){
                 let contentType = Mime.contentType(filepath);
@@ -243,9 +244,6 @@ class HttpServer extends Server {
      */
     async getPublicFile(url){
         let filepath = this.publicFiles.get(url);
-        if(!filepath){
-            filepath = await this.findPublicFile(url);
-        }
         return filepath || null;
     }
 
@@ -264,7 +262,7 @@ class HttpServer extends Server {
             return this.publicFileResponse(filepath, response);
         }
         else {
-            return this.response404(response);
+            return this.sendStatusCode(response, 404);
         }
     }
     
@@ -275,7 +273,7 @@ class HttpServer extends Server {
      * @param {function} handler - function to handle the route
      * @return {HttpServer}
      */
-    addRoute(method, route, handler){
+    addRoute(method, route, handler){   
         method = method.toUpperCase();
         let self = this;
         this.router.on(method, route, function(request, response, params){
@@ -288,7 +286,7 @@ class HttpServer extends Server {
                     });
                 })
                 .catch(function(error){
-                    console.log(error);
+                    self.logger.error(error);
                     handler(request, response, {});
                 });
         });
@@ -409,7 +407,7 @@ class HttpServer extends Server {
      * @return {null}
      */
     handleMessageClientWhisper(message, client){
-        console.log("Cannot whisper to HTTP clients");
+        this.logger.error("Cannot whisper to HTTP clients");
         return null;
     }
 

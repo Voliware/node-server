@@ -91,18 +91,19 @@ class Server extends EventEmitter {
         };
 
         // components
-        this.logger = new Logger(options.logHandle || this.name, {
+        let logHandle = options.logHandle || this.name;
+        this.logger = new Logger(logHandle, {
             level: "debug",
-            context: this
+            context: this.constructor.name
         });
 		this.clientManager = this.createClientManager({maxClients: this.maxClients});
 		this.roomManager = this.createRoomManager({maxRooms: this.maxRooms});
         this.router = options.router || new Map();
 
 		// set the log handle of each component to the same name of the server
-		this.serverListener.logger.setName(this.name).setContext(this.serverListener);
-		this.clientManager.logger.setName(this.name).setContext(this.clientManager);
-		this.roomManager.logger.setName(this.name).setContext(this.roomManager);
+		this.serverListener.logger.setName(logHandle);
+		this.clientManager.logger.setName(logHandle);
+		this.roomManager.logger.setName(logHandle);
 
 		// handlers
 		this.attachServerListenerHandlers(this.serverListener);
