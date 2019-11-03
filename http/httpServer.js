@@ -117,26 +117,22 @@ class HttpServer extends Server {
     }
 
     /**
-     * Create a response with a static resource.
+     * Create a response with a file.
      * @param {string} filepath 
      * @param {Response} response 
      * @return {Response}
      */
-    publicFileResponse(filepath, response){
-        let self = this;
-        Fs.readFile(filepath, function(err, file){
-            if(err) {
-                return self.sendStatusCode(response, 404);
-            };
-            if(file){
-                let contentType = Mime.contentType(filepath);
-                response.setHeader('Content-Type', contentType);
-                response.statusCode = 200;
-                response.write(file);
-                response.end();
-                return response;
-            }
-        });
+    sendFile(filepath, response){
+        try{
+            let readable = Fs.createReadStream(filepath);
+            let contentType = Mime.contentType(filepath);
+            response.setHeader('Content-Type', contentType);
+            response.statusCode = 200;
+            readable.pipe(response);
+        }
+        catch(error){
+            return this.sendStatusCode(response, 404);
+        }
     }
 
     /**
@@ -259,7 +255,7 @@ class HttpServer extends Server {
             filepath = await this.findPublicFile(request.url);
         }
         if(filepath){
-            return this.publicFileResponse(filepath, response);
+            return this.sendFile(filepath, response);
         }
         else {
             return this.sendStatusCode(response, 404);

@@ -92,10 +92,7 @@ class Server extends EventEmitter {
 
         // components
         let logHandle = options.logHandle || this.name;
-        this.logger = new Logger(logHandle, {
-            level: "debug",
-            context: this.constructor.name
-        });
+        this.logger = new Logger(logHandle, {level: "debug"});
 		this.clientManager = this.createClientManager({maxClients: this.maxClients});
 		this.roomManager = this.createRoomManager({maxRooms: this.maxRooms});
         this.router = options.router || new Map();

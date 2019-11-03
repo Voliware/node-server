@@ -24,10 +24,7 @@ class ObjectManager extends EventEmitter {
 	 */
 	constructor(options = {}){
         super();
-        this.logger = new Logger(options.logHandle || "objectmanager", {
-            level: "debug",
-            context: this.constructor.name
-        });
+        this.logger = new Logger(options.logHandle || "ObjectManager", {level: "debug"});
 		this.maxObjects = options.maxObjects || 0;
 		this.objects = {};
 		this.objectCount;
