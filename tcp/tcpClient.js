@@ -45,7 +45,7 @@ class TcpClient extends Client {
 	 * Attach handlers to the socket.
 	 * @param {Socket} socket 
 	 * @return {TcpClient}
-	 */
+	 */ 
 	attachSocketHandlers(socket) {
 		let self = this;
 		socket.on('data', function (data) {

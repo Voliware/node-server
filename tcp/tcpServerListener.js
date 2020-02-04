@@ -45,12 +45,11 @@ class TcpServerListener extends ServerListener {
 	 * @return {TcpServerListener}
 	 */
 	createTcpServer(){
-		let self = this;
 		this.logger.info(`TCP server started on ${this.host} on port ${this.port}`);
-		this.server = net.createServer(function(socket){
+		this.server = net.createServer((socket) => {
 			socket.setEncoding("utf8");
-			let client = self.createClient(socket);
-			self.emit('connect', client);
+			let client = this.createClient(socket);
+			this.emit('connect', client);
 		}).listen(this.port);
 		return this;
 	}
