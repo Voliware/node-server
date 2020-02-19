@@ -31,10 +31,10 @@ class UdpSocket extends EventEmitter {
      */
     write(data){
         let self = this;
+        this.logger.info('Sending msg to ' + this.address +':'+ this.port);
         this.socket.send(data, 0, data.length, this.port, this.address, function(err, bytes) {
             if (err) throw err;
-            self.logger.info('Sending msg to ' + self.address +':'+ self.port);
-            self.logger.debug(data);
+            // self.logger.debug(data);
         });
         return this;
     }

@@ -134,8 +134,11 @@ class Client extends EventEmitter {
      * @return {Client}
      */
     recordLatency(){
-        this.latency = Date.now() - this.lastPingSent;
-        this.logger.info(`Ping is ${this.latency} ms`);
+        if(this.lastPingSent){
+            this.latency = Date.now() - this.lastPingSent;
+            this.logger.info(`Ping is ${this.latency} ms`);
+        }
+        this.lastPingSent = 0;
         return this;
     }
 
