@@ -15,7 +15,6 @@ class HttpClient extends Client {
     constructor(socket, options = {}){
         let defaults = {logHandle: "HttpClient"};
         super(socket, Object.extend(defaults, options));
-        this.logger.setLogLevel("debug");
 
         // number of connected sockets this client is using
         this.sockets = 0;

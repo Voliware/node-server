@@ -76,21 +76,21 @@ class HttpServer extends Server {
      * This ends the respnose.
      * @param {object} response 
      * @param {object} data
+     * @param {number} [code=200]
      * @return {Response}
      */
-    sendJson(response, data){
+    sendJson(response, data, code = 200){
         try {
             let json = JSON.stringify(data);
-            response.statusCode = 200;
+            response.statusCode = code;
             response.setHeader('Content-Type', 'application/json');
             response.write(json);
-            response.end();
         }
         catch (error){
             this.logger.error(error);
             response.statusCode = 500;
-            response.end();
         }
+        response.end();
         return response;
     };
     
