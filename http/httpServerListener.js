@@ -12,41 +12,55 @@ class HttpServerListener extends ServerListener {
 
 	/**
 	 * Constructor
-	 * @param {object} [options]
-	 * @param {string} [options.host='localhost']
-	 * @param {number} [options.port=80]
-	 * @param {boolean} [options.https=false]
-	 * @param {string} [options.certificatePath='sslcert/server.cert']
-	 * @param {string} [options.privateKeyPath='sslcert/server.key']
-	 * @param {string} [options.logHandle]
+	 * @param {Object} [options]
+	 * @param {Number} [options.host="localhost"]
+	 * @param {Number} [options.port=80]
+	 * @param {Boolean} [options.https=false]
+	 * @param {String} [options.certificate_path='sslcert/server.cert']
+	 * @param {String} [options.private_key_path='sslcert/server.key']
 	 * @return {HttpServerListener}
 	 */
-	constructor(options){
-		let defaults = {
-			host: 'localhost',
-			port: 80,
-			https: false,
-			certificatePath: 'sslcert/server.cert',
-			privateKeyPath: 'sslcert/server.key',
-			logHandle: 'HttpServerListener'
-		};
-		super(Object.extend(defaults, options));
+	constructor({
+        https = false,
+        host = "localhost",
+        port = 80,
+        certificate_path = "sslcert/server.cert",
+        private_key_path = "sslcert/server.key"
+    })
+    {
+		super({host, port});
 
-        // properties
-        this.httpServer = null;
-		this.https = this.options.https;
+        /**
+         * Whether or not this is HTTPS
+         * @type {Boolean}
+         */
+        this.https = https;
+        
+        /**
+         * Certificate path for HTTPS
+         * @type {String}
+         */
+        this.certificate_path = certificate_path;
+        
+        /**
+         * Private key path for HTTPS
+         * @type {String}
+         */
+        this.private_key_path = private_key_path;
+        
+        /**
+         * Private key file for HTTPS
+         */
+        this.private_key = null;
+        
+        /**
+         * Certificate file for HTTPS
+         */
 		this.certificate = null;
-		this.privateKey = null;
-		this.certificatePath = this.options.certificatePath;
-		this.privateKeyPath = this.options.privateKeyPath;
 
 		// set certs
-		if(typeof this.certificatePath === "string"){
-			this.setSslCertificateFromFile(this.certificatePath);
-		}
-		if(typeof this.privateKeyPath === "string"){
-			this.setSslPrivateKeyFromFile(this.privateKeyPath);
-        }
+        this.setSslCertificateFromFile(this.certificate_path);
+        this.setSslPrivateKeyFromFile(this.private_key_path);
         
 		return this;
 	}
@@ -54,7 +68,7 @@ class HttpServerListener extends ServerListener {
 	/**
 	 * Set SSL cerficiate a provided path or from
 	 * the path setting that was passed in the constructor.
-	 * @param {string} path
+	 * @param {String} path
 	 * @return {HttpServerListener}
 	 */
 	setSslCertificateFromFile(path){
@@ -70,12 +84,12 @@ class HttpServerListener extends ServerListener {
 	/**
 	 * Set SSL cerficiate a provided path or from
 	 * the path setting that was passed in the constructor.
-	 * @param {string} path
+	 * @param {String} path
 	 * @return {HttpServerListener}
 	 */
 	setSslPrivateKeyFromFile(path){
         if (fs.existsSync(path)) {
-            this.privateKey = fs.readFileSync(path, 'utf8');
+            this.private_key = fs.readFileSync(path, 'utf8');
         }
         else {
             this.logger.warning("SSL key file does not exist");
@@ -88,25 +102,24 @@ class HttpServerListener extends ServerListener {
 	 * @return {HttpServerListener}
 	 */
 	attachHttpServerHandlers(){
-		let self = this;
-		this.httpServer.on('error', function(error){
-			self.logger.error(error);
+		this.server.on('error', (error) => {
+			this.logger.error(error);
         });
-        this.httpServer.on('connection', function(socket){
-            let clientName = socket.remoteAddress;
-			let client = self.clientManager.getClient(clientName);
+        this.server.on('connection', (socket) => {
+            let client_name = socket.remoteAddress;
+			let client = this.client_manager.get(client_name);
 			if(client){
 				client.attachSocketHandlers(socket);
 				client.incrementSocketCount();
 			}
 			else {
-				client = self.createClient(socket);
-				self.emit('connect', client);
+				client = this.createClient(socket);
+				this.emit('connect', client);
 			}
         });
-        this.httpServer.on('request', function(request, response){
-            self.logger.debug(`Requested method: ${request.method} of ${request.url}`);
-            self.emit('request', request, response);
+        this.server.on('request', (request, response) => {
+            this.logger.debug(`Requested method: ${request.method} of ${request.url}`);
+            this.emit('request', request, response);
         });
 		return this;
 	}
@@ -118,10 +131,10 @@ class HttpServerListener extends ServerListener {
 	 */
 	listen(){
 		if(this.https === true){
-			this.httpServer = this.createHttpsServer(null);
+			this.server = this.createHttpsServer(null);
 		}
 		else {
-			this.httpServer = this.createHttpServer(null);
+			this.server = this.createHttpServer(null);
 		}
 		this.attachHttpServerHandlers();
 		this.logger.info(`Listening on ${this.host} port ${this.port}`);
@@ -133,13 +146,13 @@ class HttpServerListener extends ServerListener {
 	 * @return {HttpServerListener}
 	 */
     close(){
-        this.httpServer.close();
+        this.server.close();
 		return this;
     }
 
 	/**
 	 * Create an HTTP server.
-	 * @param {object} listener
+	 * @param {Object} listener
 	 * @return {Server}
 	 */
 	createHttpServer(listener){
@@ -155,11 +168,11 @@ class HttpServerListener extends ServerListener {
 	/**
 	 * Create an HTTPS server.
 	 * Requires that keys are set.
-	 * @param {object} listener
+	 * @param {Object} listener
 	 * @return {Server}
 	 */
 	createHttpsServer(listener){
-		let server = https.createServer({key: this.privateKey, cert: this.certificate}, listener);
+		let server = https.createServer({key: this.private_key, cert: this.certificate}, listener);
 		server.listen({
 			host: this.host,
 			port: this.port
@@ -171,20 +184,10 @@ class HttpServerListener extends ServerListener {
 	/**
 	 * Create an HttpClient.
 	 * @param {Socket} socket 
-     * @param {object} [options]
-     * @param {string} [options.logHandle]
-	 * @param {object} [connectData] 
 	 * @return {HttpClient}
 	 */
-	createClient(socket, options, connectData){
-		let id = socket.remoteAddress;
-		let defaults = {
-			name: "HttpClient"+id,
-			id: id,
-			logHandle: this.logger.handle
-		};
-		let opts = Object.extend(this.clientOptions, defaults, options);
-		return new HttpClient(socket, opts);
+	createClient(socket){
+		return new HttpClient(socket, {id: socket.remoteAddress});
 	}
 }
 

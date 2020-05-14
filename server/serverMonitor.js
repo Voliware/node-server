@@ -1,30 +1,55 @@
+/**
+ * Server statistics
+ */
 class ServerMonitor {
+
+    /**
+     * Constructor
+     * @returns {ServerMonitor}
+     */
     constructor(){
-        this.startTime = 0;
-        this.stopTime = 0;
-        this.upTime = 0;
+        this.time = {
+            start: 0,
+            stop: 0,
+            up: 0
+        }
         return this;
     }
 
+    /**
+     * Get the current server uptime
+     * @returns how long the server has been up in seconds
+     */
     getUpTime(){
-        if(this.upTime){
-            return this.upTime;
+        if(this.time.up){
+            return this.time.up;
         }
-        if(this.startTime){
-            return this.startTime - Date.now();
+        if(this.time.start){
+            return this.time.start - Date.now();
         }
         return 0;
     }
 
+    /**
+     * Start the monitor.
+     * Reset all time stats.
+     * @returns {ServerMonitor}
+     */
     start(){
-        this.stopTime = 0;
-        this.startTime = Date.now();
+        this.time.up = 0;
+        this.time.stop = 0;
+        this.time.start = Date.now();
         return this;
     }
 
+    /**
+     * Stop the monitor.
+     * Record total uptime.
+     * @returns {ServerMonitor}
+     */
     stop(){
-        this.stopTime = Date.now();
-        this.upTime = this.stopTime - this.startTime;
+        this.time.stop = Date.now();
+        this.time.up = this.time.stop - this.time.start;
         return this;
     }
 }

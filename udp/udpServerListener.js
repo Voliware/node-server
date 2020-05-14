@@ -11,12 +11,11 @@ class UdpServerListener extends ServerListener {
 
 	/**
 	 * Constructor
-	 * @param {object} [options]
+	 * @param {Object} [options]
 	 * @return {UdpServerListener}
 	 */
 	constructor(options){
-        let defaults = {name: "UdpServerListener"};
-		super(Object.extend(defaults, options));
+		super(options);
 		return this;
 	}
 
@@ -45,29 +44,28 @@ class UdpServerListener extends ServerListener {
 	 * @return {UdpServerListener}
 	 */
 	createUdpServer(){
-		let self = this;
-		this.server = dgram.createSocket('udp4');
-		this.server.on('listening', function(){
-			let addr = this.address();
-			self.logger.info(`Listening on ${addr.address} port ${addr.port}`);
+        this.server = dgram.createSocket('udp4');
+		this.server.on('listening', () => {
+			let addr = this.server.address();
+			this.logger.info(`Listening on ${addr.address} port ${addr.port}`);
 		});
-		this.server.on('message', function(message, rinfo){
-			let clientName = `${rinfo.address}:${rinfo.port}`;
+		this.server.on('message', (message, rinfo) => {
+			let client_name = `${rinfo.address}:${rinfo.port}`;
 			// if the client exists, pipe msg to client
-			let client = self.clientManager.getClient(clientName);
+			let client = this.client_manager.get(client_name);
 			if(client){
 				client.socketReceive(message, rinfo);
 			}
 			// new client
 			else {
-				client = self.createClient(rinfo);
-				self.emit('connect', client);
+				client = this.createClient(rinfo);
+				this.emit('connect', client);
 				client.socketReceive(message, rinfo);
 			}
 		});
-		this.server.on('error', function(error){
-			self.logger.error("Server error:");
-			self.logger.error(error);
+		this.server.on('error', (error) => {
+			this.logger.error("Server error:");
+			this.logger.error(error);
 		});
 
 		this.logger.info(`UDP server started on ${this.host} on port ${this.port}`);
@@ -77,23 +75,18 @@ class UdpServerListener extends ServerListener {
 
 	/**
 	 * Create a UdpClient.
-	 * @param {object} socket 
-     * @param {object} [options]
-	 * @param {object} [connectData] 
+	 * @param {Object} socket 
+     * @param {Object} [options]
+	 * @param {Object} [connectData] 
 	 * @return {UdpClient}
 	 */
 	createClient(socket, options, connectData){
 		let id = `${socket.address}:${socket.port}`;
-		let defaults = {
-			name: "UdpClient@"+id,
-			id: id,
-			logHandle: this.logger.handle
-		};
-		let opts = Object.extend(this.clientOptions, defaults, options);
-		let udpSocket = new UdpSocket(socket.address, socket.port, {
-			logHandle: "UdpClient@"+id
+		let udp_socket = new UdpSocket({
+            address: socket.address,
+            port: socket.port
 		});
-		return new UdpClient(udpSocket, opts);
+		return new UdpClient(udp_socket, {id});
 	}
 }
 

@@ -1,4 +1,5 @@
 const JsonMessage = require('./../json/jsonMessage');
+const Message = require('./../message/message');
 
 /**
  * A Message with Buffer based JSON serialization and deserialization.
@@ -12,15 +13,36 @@ class BufferJsonMessage extends JsonMessage {
 
     /**
      * Constructor
-     * @param {object} [options={}] 
-     * @param {string} [options.eof="\r"]
-     * @param {string} [options.encoding="utf8"]
+     * @param {Object} [options={}] 
+     * @param {String} [options.eof="\r"]
+     * @param {String} [options.encoding="utf8"]
+	 * @param {Number} [options.route=null] - command
+	 * @param {Object} [options.data=null] - data
+	 * @param {Number} [options.status=Message.status.ok] - status
      * @return {Message}
      */
-    constructor(options = {}){
-        super(options);
-        this.eof = options.eof || "\r";
-        this.encoding = options.encoding || "utf8";
+    constructor({
+        eof = "\r", 
+        encoding = "utf8",
+        route = "",
+        data = null,
+        status = Message.status.ok
+    })
+    {
+        super({route, data, status});
+
+        /**
+         * End of message delimter.
+         * @type {String}
+         */
+        this.eof = eof;
+
+        /**
+         * The message encoding
+         * @type {String}
+         */
+        this.encoding = encoding;
+
         return this;
     }
 
@@ -39,7 +61,7 @@ class BufferJsonMessage extends JsonMessage {
     /**
      * Convert the Message into a JSON string 
      * and then convert that into a Buffer.
-     * @return {string|null}
+     * @return {String|Null}
      */
     toJsonBuffer(){
         let string = this.toJsonString();
@@ -53,7 +75,7 @@ class BufferJsonMessage extends JsonMessage {
     /**
      * Serialize the Message into a 
      * Buffer containing a JSON string.
-     * @return {string|null}
+     * @return {String|Null}
      */
     serialize(){
         return this.toJsonBuffer();

@@ -26,30 +26,57 @@ class ServerListener extends EventEmitter {
 
     /**
      * Constructor
-     * @param {object} [options={}]
-     * @param {object} [options.clientOptions={}] - options to pass to created crients
-     * @param {string} [options.host="localhost"]
-     * @param {number} [options.port=1337]
-     * @param {number} [options.maxError=10]
-     * @param {string} [options.logHandle]
+     * @param {Object} [options={}]
+     * @param {String} [options.host="localhost"]
+     * @param {Number} [options.port=1337]
      * @return {ServerListener}
      */
-    constructor(options = {}){
+    constructor({
+        host = "localhost",
+        port = 1337
+    })
+    {
         super();
-        this.options = options;
+
+        /**
+         * Network host
+         * @type {String}
+         */
+		this.host = host;
+
+        /**
+         * Network port to listen on
+         * @type {Number}
+         */
+        this.port = port;
+        
+        /**
+         * Client manager
+         * @type {ClientManager}
+         */
+        this.client_manager = new ClientManager();
+
+        /**
+         * Node server object
+         * @type {Server}
+         */
         this.server = null;
-		this.host = options.host || "localhost";
-        this.port = options.port || 1337;
-        this.clientOptions = options.clientOptions || {};
-		this.clientManager = new ClientManager();
-        this.maxErrors = isNaN(options.maxError) ? 10 : options.maxError;
-        this.logger = new Logger(options.logHandle || this.host, {level: "debug"});
+
+        /**
+         * Logger object
+         * @type {Logger}
+         */
+        this.logger = new Logger(this.constructor.name, {
+            context: `${this.host}:${this.port}`,
+            level: "debug"
+        });
+
         return this;
     }
 
     /**
      * Begin listening.
-     * @param {object} [options]
+     * @param {Object} [options]
 	 * @return {ServerListener}
      */
     listen(options){
@@ -67,8 +94,8 @@ class ServerListener extends EventEmitter {
     /**
      * Create a Client that has a socket of some kind.
      * @param {*} socket 
-     * @param {object} [options]
-     * @param {string} [options.logHandle]
+     * @param {Object} [options]
+     * @param {String} [options.log_handle]
      * @param {*} data
      * @return {Client} 
      */
@@ -78,11 +105,11 @@ class ServerListener extends EventEmitter {
 
 	/**
 	 * Set the ClientManager.
-	 * @param {ClientManager} clientManager 
+	 * @param {ClientManager} client_manager 
 	 * @return {ServerListener}
 	 */
-	setClientManager(clientManager){
-		this.clientManager = clientManager;
+	setClientManager(client_manager){
+		this.client_manager = client_manager;
 		return this;
 	}
 }

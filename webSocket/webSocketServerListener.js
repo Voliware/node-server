@@ -14,12 +14,11 @@ class WebSocketServerListener extends HttpServerListener {
 
 	/**
 	 * Constructor
-	 * @param {object} [options]
+	 * @param {Object} [options]
 	 * @return {WebSocketServerListener}
 	 */
 	constructor(options = {}){
-		let defaults = {logHandle: 'WebSocketServerListener'};
-		super(Object.extend(defaults, options));
+		super(options);
 		return this;
 	}
 
@@ -30,7 +29,7 @@ class WebSocketServerListener extends HttpServerListener {
 	 */
 	listen(){
         super.listen();
-        this.webSocketServer = this.createWebSocketServer(this.httpServer);
+        this.webSocketServer = this.createWebSocketServer(this.server);
         this.attachWebSocketServerHandlers();
 		return this;
 	}
@@ -47,7 +46,7 @@ class WebSocketServerListener extends HttpServerListener {
 
 	/**
 	 * Create a websocket server
-	 * @param {object} server - an http/s server
+	 * @param {Object} server - an http/s server
 	 * @return {WebSocketServer}
 	 */
 	createWebSocketServer(server){
@@ -82,21 +81,11 @@ class WebSocketServerListener extends HttpServerListener {
 	/**
 	 * Create a WebSocketClient.
 	 * @param {WebSocket} socket 
-     * @param {object} [options]
-     * @param {string} [options.logHandle]
-	 * @param {object} [connectData] 
 	 * @return {WebSocketClient}
 	 */
-	createClient(socket, options = this.clientOptions, connectData){
-        // console.log(socket);
+	createClient(socket){
 		let id = `@${socket._socket.remoteAddress}:${socket._socket.remotePort}`;
-		let defaults = {
-			name: "WSClient"+id,
-			id: id,
-			logHandle: this.logger.handle
-		};
-		let opts = Object.extend(this.clientOptions, defaults, options);
-		return new WebSocketClient(socket, opts);
+		return new WebSocketClient(socket, {id});
 	}
 }
 

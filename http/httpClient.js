@@ -9,15 +9,19 @@ class HttpClient extends Client {
     /**
      * Constructor
 	 * @param {Socket} socket
-	 * @param {object} [options={}]
+     * @param {Object} options
+     * @param {Number} options.id
      * @return {HttpClient}
      */
-    constructor(socket, options = {}){
-        let defaults = {logHandle: "HttpClient"};
-        super(socket, Object.extend(defaults, options));
+    constructor(socket, {id = 0}){
+        super(socket, {id});
 
-        // number of connected sockets this client is using
-        this.sockets = 0;
+        /**
+         * Number of connected sockets this client is using
+         * @type {Number}
+         */
+        this.socket_count = 0;
+        
         return this;
     }
 
@@ -26,7 +30,7 @@ class HttpClient extends Client {
      * @return {HttpClient}
      */
     incrementSocketCount(){
-        this.sockets++;
+        this.socket_count++;
         return this;
     }
 
@@ -35,7 +39,7 @@ class HttpClient extends Client {
      * @return {HttpClient}
      */
     decrementSocketCount(){
-        this.sockets--;
+        this.socket_count--;
         return this;
     }
 
@@ -46,7 +50,7 @@ class HttpClient extends Client {
      * @return {HttpClient}
      */
     checkSocketCount(){
-        if(!this.sockets){
+        if(!this.socket_count){
             this.emit('disconnected');
             this.logger.info("Disconnected");
         }
@@ -69,35 +73,34 @@ class HttpClient extends Client {
      * @return {Client}
      */ 
     attachSocketHandlers(socket){
-        let self = this;
-        socket.on('close', function(hadError){
-            self.onClose(socket, hadError);
-            self.decrementSocketCount();
-            self.checkSocketCount();
+        socket.on('close', (hadError) => {
+            this.onClose(socket, hadError);
+            this.decrementSocketCount();
+            this.checkSocketCount();
         });
-        socket.on('connect', function(){
-            self.onConnect(socket);
+        socket.on('connect', () => {
+            this.onConnect(socket);
         });
-        socket.on('data', function(data){
-            self.onData(socket, data);
+        socket.on('data', (data) => {
+            this.onData(socket, data);
         });
-        socket.on('drain', function(){
-            self.onDrain(socket);
+        socket.on('drain', () => {
+            this.onDrain(socket);
         });
-        socket.on('end', function(){
-            self.onEnd(socket);
+        socket.on('end', () => {
+            this.onEnd(socket);
         });
-        socket.on('error', function(error){
-            self.onError(socket, error);
+        socket.on('error', (error) => {
+            this.onError(socket, error);
         });
-        socket.on('lookup', function(error){
-            self.onLookup(socket, error, address, family, host);
+        socket.on('lookup', (error) => {
+            this.onLookup(socket, error, address, family, host);
         });
-        socket.on('ready', function(){
-            self.onReady(socket);
+        socket.on('ready', () => {
+            this.onReady(socket);
         });
-        socket.on('timeout', function(){
-            self.onTimeout(socket);
+        socket.on('timeout', () => {
+            this.onTimeout(socket);
         });
         return this;
     }
@@ -105,7 +108,7 @@ class HttpClient extends Client {
     /**
      * Socket "close" event handler
      * @param {Socket} socket 
-     * @param {boolean} hadError 
+     * @param {Boolean} hadError 
      * @return {HttpClient}
      */
     onClose(socket, hadError){
@@ -158,7 +161,7 @@ class HttpClient extends Client {
     /**
      * Socket "error" event handler
      * @param {Socket} socket 
-     * @param {object} error
+     * @param {Object} error
      * @return {HttpClient}
      */
     onError(socket, error){
@@ -170,9 +173,9 @@ class HttpClient extends Client {
     /**
      * Socket "connect" event handler
      * @param {Socket} socket 
-     * @param {object} error
-     * @param {string} family
-     * @param {string} host
+     * @param {Object} error
+     * @param {String} family
+     * @param {String} host
      * @return {HttpClient}
      */
     onLookup(socket, error, address, family, host){

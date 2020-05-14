@@ -19,23 +19,48 @@ class Message {
 
 	/**
 	 * Constructor
-	 * @param {object} [options]
-	 * @param {number} [options.route=null] - command
-	 * @param {object} [options.data=null] - data
-	 * @param {number} [options.status=Message.status.ok] - status
+	 * @param {Object} [options]
+	 * @param {Number} [options.route=null] - command
+	 * @param {Object} [options.data=null] - data
+	 * @param {Number} [options.status=Message.status.ok] - status
 	 * @return {Message}
 	 */
-	constructor(options = {}){
-		this.route = options.route || "";
-		this.data = options.data || {};
-		this.status = options.status || Message.status.ok;
+	constructor({
+        route = "",
+        data = null,
+        status = Message.status.ok
+    })
+    {
+        /**
+         * The message route.
+         * @type {String}
+         */
+        this.route = route;
+        
+        /**
+         * The message data
+         * @type {Object}
+         */
+        this.data = data;
+        
+        /**
+         * The message status
+         * @type {Message.status}
+         */
+        this.status = status;
+
+        /**
+         * The time the message was created in s
+         * @type {Number}
+         */
 		this.timestamp = Date.now();
+        
 		return this;
 	}
 	
     /**
      * Set the route
-     * @param {number|string} route 
+     * @param {Number|String} route 
 	 * @return {Message}
      */
     setRoute(route){
@@ -45,7 +70,7 @@ class Message {
 	
 	/**
 	 * Get the route
-	 * @return {number|string}
+	 * @return {Number|String}
 	 */
 	getRoute(){
 		return this.route;
@@ -53,7 +78,7 @@ class Message {
 
     /**
      * Set the status
-     * @param {number} status 
+     * @param {Number} status 
 	 * @return {Message}
      */
     setStatus(status){
@@ -76,7 +101,7 @@ class Message {
      * Get whether the message has been fully 
      * processed by a handler, and should no 
      * longer be handled.
-     * @return {boolean}
+     * @return {Boolean}
      */
     isDone(){
         return this.status === Message.status.done;
@@ -84,7 +109,7 @@ class Message {
 
 	/**
 	 * Get the status
-	 * @return {number|string}
+	 * @return {Number|String}
 	 */
 	getStatus(){
 		return this.status;
@@ -102,7 +127,7 @@ class Message {
 	
 	/**
 	 * Get the data
-	 * @return {number|string}
+	 * @return {Number|String}
 	 */
 	getData(){
 		return this.data;
@@ -110,7 +135,7 @@ class Message {
 
 	/**
 	 * Set the message to be an error message
-	 * @param {string} [text]
+	 * @param {String} [text]
 	 * @return {Message}
 	 */ 
 	setError(text){
@@ -134,7 +159,7 @@ class Message {
 	 * Serialize the message to an object.
 	 * If any message properties are null,
 	 * they are not included in the object.
-	 * @return {object}
+	 * @return {Object}
 	 */
 	toObject(){
 		let obj = {
@@ -154,11 +179,11 @@ class Message {
 
 	/**
 	 * Set Message properties from an object.
-	 * @param {object} obj
-	 * @param {number|string} obj.route
-	 * @param {number|string} [obj.status]
+	 * @param {Object} obj
+	 * @param {Number|String} obj.route
+	 * @param {Number|String} [obj.status]
 	 * @param {*} [obj.data]
-	 * @param {number|string} [obj.timestamp]
+	 * @param {Number|String} [obj.timestamp]
 	 * @return {Message}
 	 */
 	fromObject(obj){
@@ -179,7 +204,7 @@ class Message {
 
 	/**
 	 * Serialize the message into a simple object.
-	 * @return {object}
+	 * @return {Object}
 	 */
 	serialize(){
 		return this.toObject();

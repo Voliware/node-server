@@ -13,12 +13,12 @@ class ConsoleInput extends EventEmitter {
      */
     constructor(){
         super();
-        this.readLine = readline.createInterface({
+        this.read_line = readline.createInterface({
             input: process.stdin,
             output: null // cool this doesnt work
         });
         let self = this;
-        this.readLine.on('line', function(line){
+        this.read_line.on('line', function(line){
             // console.log("-> " + line);
             self.emit('line', line);
         });

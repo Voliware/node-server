@@ -124,8 +124,8 @@ if(typeof Object.filter !== 'function'){
  * Wraps a for in loop.
  * For each object it will pass the
  * property name and value to a callback.
- * @param {object} data - data to loop through
- * @param {function} cb - callback
+ * @param {Object} data - data to loop through
+ * @param {Function} cb - callback
  */
 function each(data, cb){
 	for(let i in data){

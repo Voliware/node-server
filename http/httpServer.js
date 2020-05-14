@@ -5,6 +5,7 @@ const Path = require('path');
 const Mime = require('mime-types');
 const Router = require('find-my-way');
 const UserAgent = require('useragent');
+const HttpServerListener = require('./httpServerListener');
 
 /**
  * HTTP Server.
@@ -15,43 +16,69 @@ class HttpServer extends Server {
    
     /**
      * Constructor
-     * @param {object} [options={}]
-     * @param {string} [options.logHandle="HttpServer"]
-     * @param {string} [options.type="http"]
-     * @param {string} [options.publicPath="public"]
+     * @param {Object} [options={}]
+     * @param {String} [options.log_handle="HttpServer"]
+     * @param {String} [options.public_path="public"]
+     * @param {String} [options.public_index="index.html"]
      * @return {HttpServer}
      */
-    constructor(options = {}){
-        let defaults = {
-            port: 80,
-            name: "HttpServer",
-            logHandle: "HttpServer",
-            type: "http",
-            publicPath: Path.join(__dirname, '..', "public"),
-            publicIndex: "index.html",
-            router: Router()
-        };
-        super(Object.extend(defaults, options));
-        this.publicPath = defaults.publicPath;
-        this.publicIndex = defaults.publicIndex;
-        this.publicFiles = new Map();
-        this.findPublicFiles(this.publicPath);
+    constructor({
+        port = 80,
+        router = Router(),
+        public_path = "public",
+        public_index = "index.html"
+    })
+    {
+        super({port, router});
+
+        /**
+         * Public file path to public files
+         * @type {String}
+         */
+        this.public_path = Path.join(__dirname, '..', public_path);
+
+        /**
+         * Public index HTML file.
+         * @type {String}
+         */
+        this.public_index = public_index;
+        
+        /**
+         * Map of file names to file paths
+         * @type {String}
+         */
+        this.public_files = new Map();
+
+        // find all public files from the public path
+        this.findPublicFiles(this.public_path);
+
+        // set the default router route to be a file lookup
         this.router.defaultRoute = this.routePublicFile.bind(this);
+        
+        /**
+         * Listens for HTTP connections
+         * @type {HttpServerListener}
+         */
+        this.server_listener = new HttpServerListener({
+            host: this.host,
+            port: this.port
+        });
+
         // todo: this needs to be done in a more intuitive way
-        this.serverListener.setClientManager(this.clientManager);
+        this.server_listener.setClientManager(this.client_manager);
+
         return this;
     }
 
     /**
      * Attach handlers to the server listener
-     * @param {ServerListener} serverListener
+     * @param {ServerListener} server_listener
      * @return {HttpServer} 
      */
-    attachServerListenerHandlers(serverListener){
-        super.attachServerListenerHandlers(serverListener);
-        let self = this;
-        serverListener.on('request', function(request, response){
-            self.routeRequest(request, response);
+    attachServerListenerHandlers(server_listener){
+        super.attachServerListenerHandlers(server_listener);
+        server_listener.on('request', (request, response) => {
+            this.routeRequest(request, response);
         });
         return this;
     }
@@ -74,9 +101,9 @@ class HttpServer extends Server {
      * If the JSON cannot be stringified, the 
      * status code will be set to 500.
      * This ends the respnose.
-     * @param {object} response 
-     * @param {object} data
-     * @param {number} [code=200]
+     * @param {Object} response 
+     * @param {Object} data
+     * @param {Number} [code=200]
      * @return {Response}
      */
     sendJson(response, data, code = 200){
@@ -97,8 +124,8 @@ class HttpServer extends Server {
     /**
      * Get the client's IP from a request.
      * https://stackoverflow.com/questions/8107856/how-to-determine-a-users-ip-address-in-node
-     * @param {object} request
-     * @return {string}
+     * @param {Object} request
+     * @return {String}
      */
     getClientIp(request){
         return (request.headers['x-forwarded-for'] || '').split(',').pop() || 
@@ -109,8 +136,8 @@ class HttpServer extends Server {
 
     /**
      * Get the client's browser from a request.
-     * @param {object} request 
-     * @return {object}
+     * @param {Object} request 
+     * @return {Object}
      */
     getClientBrowser(request){
         return UserAgent.lookup(request.headers['user-agent']);
@@ -118,7 +145,7 @@ class HttpServer extends Server {
 
     /**
      * Create a response with a file.
-     * @param {string} filepath 
+     * @param {String} filepath 
      * @param {Response} response 
      * @return {Response}
      */
@@ -137,12 +164,12 @@ class HttpServer extends Server {
 
     /**
      * Check if a file exists
-     * @param {string} filepath
+     * @param {String} filepath
      * @return {Promise} 
      */
     fileExists(filepath){
-        return new Promise(function(resolve, reject){
-            return Fs.access(filepath, function(err){
+        return new Promise((resolve, reject) => {
+            return Fs.access(filepath, (err) => {
                 resolve(!err);
             });
         });
@@ -150,8 +177,8 @@ class HttpServer extends Server {
 
     /**
      * Check if a path is a directory
-     * @param {string} path 
-     * @return {boolean} true if it is
+     * @param {String} path 
+     * @return {Boolean} true if it is
      */
     isDirectory(path) {
         try {
@@ -167,12 +194,12 @@ class HttpServer extends Server {
      * This will block while looping through
      * the public path directory and recursively
      * add each file to the static map.
-     * @param {string} path 
+     * @param {String} path 
      * @return {HttpServer}
      */
     findPublicFiles(path){
         let directories = [];
-        this.addPublicFile("/", Path.join(this.publicPath, this.publicIndex));
+        this.addPublicFile("/", Path.join(this.public_path, this.public_index));
         while(true){
             let files = Fs.readdirSync(path);
 
@@ -184,7 +211,7 @@ class HttpServer extends Server {
                 }
                 else{
                     this.logger.debug("Registered file " + file);
-                    let url = filepath.replace(this.publicPath, "");
+                    let url = filepath.replace(this.public_path, "");
                     url = url.replace(new RegExp("\\\\", 'g'), "/");
                     this.addPublicFile(url, filepath);
                 }
@@ -203,15 +230,15 @@ class HttpServer extends Server {
     }
 
     /**
-     * Add a static file to the publicFiles
+     * Add a static file to the public_files
      * map where the key is the URL request
      * and the value is the full filepath.
-     * @param {string} url - url request, eg /js/app.js
-     * @param {string} filepath - file path, eg C:/webserver/js/app.js
+     * @param {String} url - url request, eg /js/app.js
+     * @param {String} filepath - file path, eg C:/webserver/js/app.js
      * @return {HttpServer}
      */
     addPublicFile(url, filepath){
-        this.publicFiles.set(url, filepath);
+        this.public_files.set(url, filepath);
         return this;
     }
 
@@ -219,11 +246,11 @@ class HttpServer extends Server {
      * Find a static file from the static file map.
      * If the file is not found, try to find it.
      * If the file is then found, add it to the map.
-     * @param {string} url 
-     * @return {null|string} filepath or null if not found
+     * @param {String} url 
+     * @return {Null|String} filepath or null if not found
      */
     async findPublicFile(url){
-        let filepath = Path.join(this.publicPath, url);
+        let filepath = Path.join(this.public_path, url);
         let exists = await this.fileExists(filepath);
         if(exists){
             this.addPublicFile(url, filepath);
@@ -235,11 +262,11 @@ class HttpServer extends Server {
     /**
      * Get a static file from the map
      * or from searching the FS.
-     * @param {string} url 
-     * @return {null|string}
+     * @param {String} url 
+     * @return {Null|String}
      */
     async getPublicFile(url){
-        let filepath = this.publicFiles.get(url);
+        let filepath = this.public_files.get(url);
         return filepath || null;
     }
 
@@ -264,25 +291,24 @@ class HttpServer extends Server {
     
     /**
      * Add a route to the router
-     * @param {string} method 
-     * @param {string} route 
-     * @param {function} handler - function to handle the route
+     * @param {String} method 
+     * @param {String} route 
+     * @param {Function} handler - function to handle the route
      * @return {HttpServer}
      */
     addRoute(method, route, handler){   
         method = method.toUpperCase();
-        let self = this;
-        this.router.on(method, route, function(request, response, params){
-            self.getRequestData(request)
-                .then(function(body){
+        this.router.on(method, route, (request, response, params) => {
+            this.getRequestData(request)
+                .then((body) => {
                     handler(request, response, {
                         params: params,
-                        body: self.parseBody(body, request),
-                        query: self.parseQuery(request.url)
+                        body: this.parseBody(body, request),
+                        query: this.parseQuery(request.url)
                     });
                 })
-                .catch(function(error){
-                    self.logger.error(error);
+                .catch((error) => {
+                    this.logger.error(error);
                     handler(request, response, {});
                 });
         });
@@ -291,10 +317,10 @@ class HttpServer extends Server {
 
     /**
      * Get a route callback from the router
-     * @param {string} method 
-     * @param {string} route 
-     * @param {string} [version] 
-     * @return {function}
+     * @param {String} method 
+     * @param {String} route 
+     * @param {String} [version] 
+     * @return {Function}
      */
     getRoute(method, route, version){
         return this.router.find(method, route, version);
@@ -302,8 +328,8 @@ class HttpServer extends Server {
 
     /**
      * Delete a route from the router.
-     * @param {string} method 
-     * @param {string} route 
+     * @param {String} method 
+     * @param {String} route 
      * @return {HttpServer}
      */
     deleteRoute(method, route){
@@ -332,8 +358,8 @@ class HttpServer extends Server {
 
     /**
      * Parse a url for query parameters.
-     * @param {string} url 
-     * @return {object} object for each param, empty if none
+     * @param {String} url 
+     * @return {Object} object for each param, empty if none
      */
     parseQuery(url){
         let index = url.indexOf('?');
@@ -351,9 +377,9 @@ class HttpServer extends Server {
      * the type of data. Returns the best
      * matching type of data based on 
      * the Content-Type header.
-     * @param {string} body 
+     * @param {String} body 
      * @param {Request} request 
-     * @return {object|string}
+     * @return {Object|String}
      */
     parseBody(body, request){
         let mime = Mime.extension(request.headers['content-type']);
@@ -381,15 +407,15 @@ class HttpServer extends Server {
      * @return {Promise}
      */
     getRequestData(request){
-        return new Promise(function(resolve, reject){
+        return new Promise((resolve, reject) => {
             let body = "";
-            request.on('data', function(data){
+            request.on('data', (data) => {
                 body += data.toString();
             })
-            request.on('end', function(){
+            request.on('end', () => {
                 resolve(body);
             });
-            request.on('error', function(error){
+            request.on('error', (error) => {
                 reject(error);
             });
         });
@@ -400,7 +426,7 @@ class HttpServer extends Server {
      * to instead do nothing.
      * @param {Message} message 
      * @param {HttpClient} client 
-     * @return {null}
+     * @return {Null}
      */
     handleMessageClientWhisper(message, client){
         this.logger.error("Cannot whisper to HTTP clients");

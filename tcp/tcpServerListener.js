@@ -10,12 +10,11 @@ class TcpServerListener extends ServerListener {
 
 	/**
 	 * Constructor
-	 * @param {object} [options]
+	 * @param {Object} [options]
 	 * @return {TcpServerListener}
 	 */
 	constructor(options){
-        let defaults = {name: "TcpServerListener"};
-		super(Object.extend(defaults, options));
+		super(options);
 		return this;
 	}
 
@@ -57,20 +56,11 @@ class TcpServerListener extends ServerListener {
 	/**
 	 * Create a TcpClient.
 	 * @param {Socket} socket 
-     * @param {object} [options]
-     * @param {string} [options.logHandle]
-	 * @param {object} [connectData] 
 	 * @return {TcpClient}
 	 */
-	createClient(socket, options = this.clientOptions, connectData){
+	createClient(socket){
 		let id = `${socket.remoteAddress}:${socket.remotePort}`;
-		let defaults = {
-			name: "TcpClient@"+id,
-			id: id,
-			logHandle: this.logger.handle
-		};
-		let opts = Object.extend(this.clientOptions, defaults, options);
-		return new TcpClient(socket, opts);
+		return new TcpClient(socket, {id});
 	}
 }
 

@@ -1,5 +1,6 @@
 const Client = require('../client/client');
 const WebSocket = require('ws');
+const JsonMessage = require('./../json/jsonMessage');
 
 /**
  * WebSocket Client.
@@ -12,19 +13,18 @@ class WebSocketClient extends Client {
 	/**
 	 * Constructor
 	 * @param {WebSocket} socket
-	 * @param {object} [options={}]
+	 * @param {Object} [options={}]
 	 * @return {WebSocketClient}
 	 */
-	constructor(socket, options = {}){
-        let defaults = {logHandle: "WebSocketClient"};
-        super(socket, Object.extend(defaults, options));
+	constructor(socket, {id = 0, message_type = JsonMessage}){
+        super(socket, {id, message_type});
 		return this;
     }
 
     /**
      * Get the address of the socket,
      * such as 127.0.0.1, or localhost
-     * @return {string}
+     * @return {String}
      */
     getSocketAddress(){
 		if(this.socket){
@@ -35,7 +35,7 @@ class WebSocketClient extends Client {
     /**
      * Get the port of the socket,
      * probably between 1 to 65535
-     * @return {string}
+     * @return {String}
      */
     getSocketPort(){
 		if(this.socket){
@@ -52,45 +52,39 @@ class WebSocketClient extends Client {
 	 * @return {WebSocketClient}
 	 */
     attachSocketHandlers(socket){
-        let self = this;
-        
         // on open, emit open and ping the socket
-        socket.on('open', function(data){
-			self.logger.debug(`Connected:`);
-			self.logger.debug(data);
-            self.emit('open', data);
-            setTimeout(function(){
-                self.ping();
+        socket.on('open', (data) => {
+			this.logger.debug(`Connected:`);
+			this.logger.debug(data);
+            this.emit('open', data);
+            setTimeout(() => {
+                this.ping();
             }, 1000);
         })
         
         // on message, deserialize into message object
-		socket.on('message', function(data){
-            self.logger.debug('Received message:');
-            self.logger.debug(data);
+		socket.on('message', (data) => {
+            this.logger.debug('Received message:');
+            this.logger.debug(data);
             
-            let message = self.createMessage();
+            let message = this.createMessage();
             message.deserialize(data);
-            self.routeMessage(message);
+            this.routeMessage(message);
         });
 
         // on error, increase the max error count
         // if max error is hit, emit maxError event
-		socket.on('error', function(error){
-			self.logger.error("Socket error:");
-			self.logger.error(error);
-            self.emit('error', error);
-			self.errorCount++;
-			if(self.errorCount >= self.maxErrorCount){
-				self.emit('maxError');
-                self.logger.error("Socket reached max errors");
-			}
+		socket.on('error', (error) => {
+			this.logger.error("Socket error:");
+			this.logger.error(error);
+            this.emit('error', error);
+			this.error_count++;
         });
 
         // on close, emit disconnect
-		socket.on('close', function(code, reason){
-            self.logger.debug(`Websocket closed with code: ${code}, reason: ${reason ? reason : "none"}`);
-            self.emit('disconnect', {code, reason});
+		socket.on('close', (code, reason) => {
+            this.logger.debug(`Websocket closed with code: ${code}, reason: ${reason ? reason : "none"}`);
+            this.emit('disconnect', {code, reason});
 		});
 		return this;
 	}

@@ -1,5 +1,6 @@
 const Server = require('./../server/server');
 const JsonMessage = require('./../json/jsonMessage');
+const WebSocketServerListener = require('./webSocketServerListener');
 
 /**
  * WebSocket Server.
@@ -10,23 +11,17 @@ class WebSocketServer extends Server {
 
     /**
      * Constructor
-     * @param {object} [options={}]
+     * @param {Object} [options={}]
      * @return {WebSocketServer}
      */
-    constructor(options = {}){
-        let defaults = {
-            name: "WebSocketServer",
-            logHandle: "WebSocketServer",
-            type: "websocket",
-            message: JsonMessage
-        };
-        super(Object.extend(defaults, options));
+    constructor({message = JsonMessage, port = 81}){
+        super({port, message});
+        this.server_listener = new WebSocketServerListener({
+            host: this.host,
+            port: this.port
+        });
         return this;
     }
 }
-
-// example client on the browser
-// let ws = new WebSocket("ws://localhost:1234");
-// ws.send(JSON.stringify({route:"/ping"}));
 
 module.exports = WebSocketServer;

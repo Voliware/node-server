@@ -29,61 +29,164 @@ class Client extends EventEmitter {
 
 	/**
 	 * Constructor
-     * @param {*} socket - the socket itself (TCP, UDP, HTTP/S, WS/S)
-     * @param {object} [options={}]
-     * @param {number} [options.id]
-     * @param {string} [options.name]
-	 * @param {Message} [options.message=Message] - constructor to use for creating Messages
-	 * @param {string} [options.data="buffer"] - the type of data the client receives
-     * @param {string} [options.encoding="utf8"] - rx/tx buffer encoding
-	 * @param {string} [options.eof="\r"] - rx/tx buffer end of datagram character
-     * @param {string} [options.logHandle]
-     * @param {number} [options.timeout=0] - how long it can take for a client to respond to the server
-     * @param {number} [options.heartbeatFrequency=0] - how often to send a heartbeat, 0 for never
-     * @param {function} [options.heartbeatRequest] - the heartbeat request function
-     * @param {*} [options.connectData] - any additional data that came from connect
+     * @param {Object} socket - the socket itself (TCP, UDP, HTTP/S, WS/S)
+     * @param {Object} [options={}]
+     * @param {Number} [options.id]
+	 * @param {Message} [options.message_type=Message] - constructor to use for creating Messages
+	 * @param {String} [options.data="buffer"] - the type of data the client receives
+     * @param {String} [options.encoding="utf8"] - rx/tx buffer encoding
+	 * @param {String} [options.eof="\r"] - rx/tx buffer end of datagram character
+     * @param {Number} [options.timeout=0] - how long it can take for a client to respond to the server
+     * @param {Object} [options.heartbeat]
+     * @param {Number} [options.heartbeat=0] - how often to send a heartbeat, 0 for never
+     * @param {Object} [options.connect_data] - any additional data that came from connect
 	 * @return {Client}
 	 */
-	constructor(socket, options = {}){
-		super();
-		this.socket = socket;
-		this.id = options.id || 0;
-        this.name = options.name || "Client" + this.id;
+	constructor(socket, {
+        id = 0,
+        message_type = Message,
+        data_type = "buffer",
+        encoding = "utf8",
+        eof = "\r",
+        timeout = 0,
+        heartbeat = 0,
+        connect_data = null
+    })
+    {
+        super();
         
-        // buffers
-        this.data = options.data || "buffer";
-        this.eof = options.eof || "\r";
-        this.encoding = options.encoding || 'utf8';
-        this.rxBuffer = new MessageBuffer(this.data, this.encoding, this.eof);
+        /**
+         * The network sockety.
+         * TCP, UDP, HTTP, WS, or other.
+         * @type {Object}
+         */
+        this.socket = socket;
+        
+        /**
+         * Unique id
+         * @type {Number}
+         */
+        this.id = id;
+        
+        /**
+         * Type of data the socket receives
+         * @type {String}
+         */
+        this.data_type = data_type;
+        
+        /**
+         * Data that arrived with the socket connection.
+         * @type {Object}
+         */
+        this.connect_data = connect_data;
+        
+        /**
+         * Client activity timeout.
+         * 0 for no timeout.
+         * @type {Number}
+         */
+        this.timeout = timeout;
 
-        // messaging
-        this.message = options.message || Message;
-        this.messageOptions = {
+        /**
+         * End of message delimter.
+         * @type {String}
+         */
+        this.eof = eof;
+        
+        /**
+         * The message encoding
+         * @type {String}
+         */
+        this.encoding = encoding;
+
+        /**
+         * A receive buffer for incoming messages.
+         * @type {MessageBuffer}
+         */
+        this.rx_buffer = new MessageBuffer({
+            type: this.data_type, 
+            encoding: this.encoding, 
+            eof: this.eof
+        });
+
+        /**
+         * Message constructor
+         * @type {Message|Function}
+         */
+        this.message_type = message_type;
+
+        /**
+         * Message options
+         * @type {Object}
+         */
+        this.message_options = {
             encoding: this.encoding,
             eof: this.eof
         };
         
-		// message router
+        /**
+         * Message router
+         * @type {Map}
+         */
 		this.router = new Map();
 
-		this.errorCount = 0;
-        this.maxErrorCount = 4;
-        this.lastPingSent = 0;
+        /**
+         * Number of errors encountered
+         * @type {Number}
+         */
+        this.error_count = 0;
+        
+        /**
+         * Timestamp of last ping sent
+         * @type {Number}
+         */
+        this.last_ping_sent = 0;
+        
+        /**
+         * Latency in ms
+         * @type {Number}
+         */
         this.latency = 0;
-        this.timeout = 0;
-        this.connectData = options.connectData || null;
-        this.logger = new Logger(options.logHandle || this.name, {level: "debug"});
 
-        // heartbeat
-        this.heartbeatInterval = null;
-        this.heartbeatFrequency = options.heartbeatFrequency || 0;
-        this.heartbeatRequest = options.heartbeatRequest || this.heartbeatRequest;
+        /**
+         * Logging object
+         * @type {Logger}
+         */
+        this.logger = new Logger(this.constructor.name, {
+            context: this.id,
+            level: "debug"
+        });
+
+        /**
+         * Heartbeat
+         * @type {Object}
+         */
+        this.heartbeat = {
+
+            /**
+             * Heartbeat interval object id.
+             * @type {Number}
+             */
+            interval: null,
+
+            /**
+             * How often to send a heartbeat in ms.
+             * @type {Number}
+             */
+            frequency: heartbeat,
+
+            /**
+             * Heartbeat request function
+             * @type {Function}
+             */
+            request: null
+        }
 
         // init
         this.addDefaultRoutes();
         this.attachSocketHandlers(this.socket);
 
-        if(this.heartbeatFrequency){
+        if(this.heartbeat.frequency){
            // this.startHeartbeat();
         }
 
@@ -93,7 +196,7 @@ class Client extends EventEmitter {
     /**
      * Get the address of the socket,
      * such as 127.0.0.1, or localhost
-     * @return {string}
+     * @return {String}
      */
     getSocketAddress(){
         throw new Error("getSocketAddress must be implemented")
@@ -102,7 +205,7 @@ class Client extends EventEmitter {
     /**
      * Get the port of the socket,
      * probably between 1 to 65535
-     * @return {string}
+     * @return {String}
      */
     getSocketPort(){
         throw new Error("getSocketPort must be implemented")
@@ -110,7 +213,7 @@ class Client extends EventEmitter {
     
     /**
      * Set the client's id
-     * @param {number|string} id
+     * @param {Number|String} id
      * @return {Client} 
      */
     setId(id){
@@ -120,7 +223,7 @@ class Client extends EventEmitter {
 
     /**
      * Set the client's name
-     * @param {string} name 
+     * @param {String} name 
      * @return {Client} 
      */
     setName(name){
@@ -134,11 +237,11 @@ class Client extends EventEmitter {
      * @return {Client}
      */
     recordLatency(){
-        if(this.lastPingSent){
-            this.latency = Date.now() - this.lastPingSent;
+        if(this.last_ping_sent){
+            this.latency = Date.now() - this.last_ping_sent;
             this.logger.info(`Ping is ${this.latency} ms`);
         }
-        this.lastPingSent = 0;
+        this.last_ping_sent = 0;
         return this;
     }
 
@@ -148,7 +251,7 @@ class Client extends EventEmitter {
      * @return {Client}
      */
     updateLastPingSent(){
-        this.lastPingSent = Date.now();
+        this.last_ping_sent = Date.now();
         return this;
     }
 
@@ -185,12 +288,12 @@ class Client extends EventEmitter {
 	 * Create a message.
 	 * This uses the Message constructor
 	 * passed in via the Client constructor options.
-     * @param {object} [options=null] - message options
+     * @param {Object} [options=null] - message options
 	 * @return {Message}
 	 */
 	createMessage(options = {}){
-        Object.extend(options, this.messageOptions, options);
-		return new this.message(options);
+        Object.extend(this.message_options, options);
+		return new this.message_type(options);
 	}
 
 	/**
@@ -229,7 +332,7 @@ class Client extends EventEmitter {
      * will always come from a client that has
      * just received a ping message.
      * @param {Message} message 
-     * @return {null}
+     * @return {Null}
      */
     handleMessagePong(message){
         this.recordLatency();
@@ -241,7 +344,7 @@ class Client extends EventEmitter {
      * Handle a heartbeat message by returning
      * a heartbeat message.
      * @param {Message} message 
-     * @return {null}
+     * @return {Null}
      */
     handleMessageHeartbeat(message){
         message.setDone();
@@ -300,7 +403,7 @@ class Client extends EventEmitter {
 
 	/**
 	 * Convert to object
-	 * @return {object}
+	 * @return {Object}
 	 */
 	serialize(){
 		return {
@@ -328,7 +431,7 @@ class Client extends EventEmitter {
      * @return {Client}
      */
     startHeartbeat(){
-        this.heartbeatInterval = setInterval(this.heartbeatRequest.bind(this), this.heartbeatFrequency);
+        this.heartbeat.interval = setInterval(heartbeat.request.bind(this), heartbeat.frequency);
         return this;
     }
 
@@ -337,7 +440,7 @@ class Client extends EventEmitter {
      * @return {Client}
      */
     stopHeartbeat(){
-        clearInterval(this.heartbeatInterval);
+        clearInterval(this.heartbeat.interval);
         return this;
     }
     
@@ -356,13 +459,12 @@ class Client extends EventEmitter {
      * @return {Client}
      */
     processRxData(data){
-        this.rxBuffer.append(data);
-        let datagrams = this.rxBuffer.split();
+        this.rx_buffer.append(data);
+        let datagrams = this.rx_buffer.split();
         let messages = this.datagramsToMessages(datagrams);
         
         for(let i = 0; i < messages.length; i++){
             this.routeMessage(messages[i]);
-            // console.log(messages[i])
             this.emit('message', messages[i]);
         }
 		return this;
@@ -379,7 +481,6 @@ class Client extends EventEmitter {
         for(let i = 0; i < datagrams.length; i++){
             let message = this.createMessage();
             message.deserialize(datagrams[i]);
-            // console.log(message);
             messages.push(message);
         }
 		return messages;

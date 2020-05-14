@@ -8,7 +8,6 @@ const JsonMessage = require('./json/jsonMessage');
 const Message = require('./message/message');
 const MessageBuffer = require('./message/messageBuffer');
 const Room = require('./room/room');
-const RoomManager = require('./room/roomManager');
 const Server = require('./server/server');
 const ServerListener = require('./server/serverListener');
 const TcpClient = require('./tcp/tcpClient');
@@ -33,7 +32,6 @@ module.exports = {
     Message,
     MessageBuffer,
     Room,
-    RoomManager,
     Server,
     ServerListener,
     TcpClient,

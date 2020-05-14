@@ -1,7 +1,6 @@
 const Socket = require('net').Socket;
 const Client = require('../client/client');
-const util = require('../util/util');
-const isString = util.isString;
+const BufferJsonMessage = require('./../buffer/bufferJsonMessage');
 
 /**
  * UDP Client
@@ -12,22 +11,18 @@ class UdpClient extends Client {
 	/**
 	 * Constructor
 	 * @param {Socket} socket
-	 * @param {object} [options={}]
+	 * @param {Object} [options={}]
 	 * @return {UdpClient}
 	 */
-	constructor(socket, options={}){
-        let defaults = {
-            logHandle: "UdpClient",
-            heartbeatFrequency: 1000
-        };
-        super(socket, Object.extend(defaults, options));
+    constructor(socket, {id = 0, message_type = BufferJsonMessage}) {
+        super(socket, {id, message_type});
 		return this;
 	}
 
     /**
      * Get the address of the socket,
      * such as 127.0.0.1, or localhost
-     * @return {string}
+     * @return {String}
      */
     getSocketAddress(){
 		if(this.socket){
@@ -38,7 +33,7 @@ class UdpClient extends Client {
     /**
      * Get the port of the socket,
      * probably between 1 to 65535
-     * @return {string}
+     * @return {String}
      */
     getSocketPort(){
 		if(this.socket){
@@ -52,31 +47,26 @@ class UdpClient extends Client {
 	 * @return {UdpClient}
 	 */
 	attachSocketHandlers(socket){		
-		let self = this;
-		socket.on('data', function(data){
-			self.processRxData(data);
+		socket.on('data', (data) => {
+			this.processRxData(data);
 		});
-		socket.on('error', function(){
-			self.logger.error("Socket error:");
-			self.logger.error(error);
-			self.emit('error', error);
-			self.errorCount++;
-			if(self.errorCount >= self.maxErrorCount){
-                self.logger.error("Socket reached max errors");
-				self.emit('maxError');
-			}
+		socket.on('error', () => {
+			this.logger.error("Socket error:");
+			this.logger.error(error);
+			this.emit('error', error);
+			this.error_count++;
 		});
-		socket.on('timeout', function(){
-			self.logger.warning("Socket has timed out");
-			self.emit('timeout');
+		socket.on('timeout', () => {
+			this.logger.warning("Socket has timed out");
+			this.emit('timeout');
 		});
-		socket.on('end', function(){
-			self.logger.info("Socket has ended");
-			self.emit('disconnect');
+		socket.on('end', () => {
+			this.logger.info("Socket has ended");
+			this.emit('disconnect');
 		});
-		socket.on('close', function(){
-			self.logger.info("Socket has closed");
-			self.emit('disconnect');
+		socket.on('close', () => {
+			this.logger.info("Socket has closed");
+			this.emit('disconnect');
 		});
 		return this;
 	}
@@ -102,7 +92,7 @@ class UdpClient extends Client {
     /**
      * Virtually receive data from the socket.
      * @param {*} data 
-     * @param {object} rinfo - connection info, should be the same
+     * @param {Object} rinfo - connection info, should be the same
      * @return {UdpSocket}
      */
 	socketReceive(data, rinfo){
@@ -114,7 +104,7 @@ class UdpClient extends Client {
 
 	/**
 	 * Convert to object
-	 * @return {object}
+	 * @return {Object}
 	 */
 	serialize(){
 		return {

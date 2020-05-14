@@ -5,29 +5,52 @@ class MessageBuffer {
 
     /**
      * Constructor
-     * @param {string} type 
-     * @param {string} encoding
-     * @param {string} eof
+     * @param {Object} options
+     * @param {String} [options.type="string"] 
+     * @param {String} [options.encoding="utf8"]
+     * @param {String} [options.eof="\r"]
      * @return {MessageBuffer}
      */
-    constructor(type, encoding, eof){
+    constructor({type = "string", encoding = "utf8", eof = "\r"}){
+
+        /**
+         * The buffer type.
+         * @type {String}
+         */
         this.type = type;
-        this.buffer = null;
+
+        /**
+         * The message encoding
+         * @type {String}
+         */
         this.encoding = encoding;
+
+        /**
+         * End of message delimter.
+         * @type {String}
+         */
         this.eof = eof;
+
+        /**
+         * Data buffer
+         * @type {Buffer|String}
+         */
+        this.buffer = null;
+
         if(this.type === "string"){
             this.append = this.appendString;
         }
-        else {
+        else if(this.type === "buffer"){
             this.append = this.appendBuffer;
         }
+        
         return this;
     }
 
     /**
      * Append data to the buffer.
      * This function is actually set during construction.
-     * @param {Buffer|string} data
+     * @param {Buffer|String} data
      * @return {MessageBuffer}
      */
     append(data){
@@ -45,7 +68,7 @@ class MessageBuffer {
     
     /**
      * Append data to the buffer.
-     * @param {string} buffer
+     * @param {String} buffer
      * @return {MessageBuffer}
      */
     appendString(buffer){

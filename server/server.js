@@ -1,15 +1,12 @@
 const EventEmitter = require('events').EventEmitter;
-const Message = require ('../message/message');
-const JsonMessage = require ('../json/jsonMessage');
-const ServerListener = require ('./serverListener');
+const Message = require('../message/message');
+const JsonMessage = require('../json/jsonMessage');
+const ServerListener = require('./serverListener');
 const ServerMonitor = require('./serverMonitor');
 const Client = require('./../client/client');
 const ClientManager = require('./../client/clientManager');
-const RoomManager = require('./../room/roomManager');
-const UdpServerListener = require('./../udp/udpServerListener');
-const TcpServerListener = require('./../tcp/tcpServerListener');
-const HttpServerListener = require('./../http/httpServerListener');
-const WebSocketServerListener = require('./../webSocket/webSocketServerListener');
+const ObjectManager = require('./../util/objectManager');
+const Room = require('./../room/room');
 const Logger = require('@voliware/logger');
 
 /**
@@ -24,121 +21,156 @@ class Server extends EventEmitter {
 
 	/**
 	 * Constructor
-	 * @param {object} [options={}]
-	 * @param {string} [options.name="Server"] - the name of the server
-     * @param {string} [options.host="localhost"] - the host address
-     * @param {number} [options.port=3000] - the port to listen on
-     * @param {string} [options.type="websocket"] - the server type
-     * @param {string} [options.data="buffer"] - for tcp/udp, what format to send/receive data in, ie buffer or string.
-     *                 For Websocket, this is not relevant.
+	 * @param {Object} [options={}]
+     * @param {String} [options.host="localhost"] - the host address
+     * @param {Number} [options.port=3000] - the port to listen on
+     * @param {String} [options.data="buffer"] - for tcp/udp, what format to send/receive data in, ie buffer or string.
+     *                                          For Websocket, this is not relevant.
      * @param {Message} [options.message=JsonMessage] - the type of message to use
-     * @param {number} [options.maxErrors=0] - max num of errors the server can tolerate, or 0 for no max
-     * @param {number} [options.maxClients=0] - max num of clients, or 0 for no max
-     * @param {number} [options.maxClientErrors=0] - how many errors a client can have before disconnecting it
-     * @param {number} [options.maxRooms=0] - max num of rooms, or 0 for no max
-     * @param {number} [options.clientTimeout=0] - how long to give a client to respond to a message, 0 for no limit. 
-     * @param {number} [options.heartbeat=10000] - how often to send a heartbeat to UDP clients
-	 * @param {ServerListener} [options.serverListener] - the type of server listener to use. If specified
+     * @param {Number} [options.max_clients=0] - max num of clients, or 0 for no max
+     * @param {Number} [options.max_rooms=0] - max num of rooms, or 0 for no max
+     * @param {Number} [options.heartbeat=0] - how often to send a heartbeat to UDP clients
+	 * @param {ServerListener} [options.server_listener] - the type of server listener to use. If specified
      *                         this will replace the server listener determined by options.type.                          
-	 * @param {string} [options.logHandle] - the log handle
-	 * @param {function} [options.router] - the router to route requests
+	 * @param {Function} [options.router] - the router to route requests
 	 * @return {Server}
 	 */
-	constructor(options = {}){
+    constructor({
+        host = "localhost",
+        port = 3000,
+        data_type = "buffer",
+        message_type = JsonMessage,
+        client_timeout = 0,
+        max_clients = 0,
+        max_rooms = 0,
+        heartbeat = 0,
+        server_listener  = null,
+        router = new Map()
+    }){
         super();
         
-        this.options = options;
+        /**
+         * Server host.
+         * localhost for self, or 127.0.0.1.
+         * @type {String}
+         */
+        this.host = host;
 
-		// server properties
-		this.name = options.name || "Server";
-        this.host = options.host || "localhost";
-		this.port = options.port || 3000;
-        this.type = options.type || "websocket";
-        this.data = options.data || "buffer";
-        this.message = options.message || JsonMessage;
-        this.maxErrors = options.maxErrors || 0;
-        this.maxClients = options.maxClients || 0;
-        this.maxClientErrors = options.maxClientErrors || 0;
-        this.maxRooms = options.maxRooms || 0;
-        this.clientTimeout = options.clientTimeout || 0;
-        this.heartbeat = options.heartbeat || 1000;
-
-        this.monitor = new ServerMonitor();
+        /**
+         * Port to start the server on.
+         * @type {Number}
+         */
+        this.port = port;
         
-        // server listener
-        // if passed, used passed server listener, 
-        // otherwise use options.type to create one
-        this.serverListener = options.serverListener || null;
-        if(!this.serverListener){
-            this.serverListener = this.createServerListener(this.type, {
-                host: this.host,
-                port: this.port,
-                maxErrors: this.maxErrors,
-                clientOptions: {
-                    message: this.message,
-                    data: this.data,
-                    encoding: this.encoding,
-                    eof: this.eof,
-                    heartbeat: this.heartbeat
-                }
-            });
-        }
+        /**
+         * What the incoming data looks like.
+         * buffer or string.
+         * @type {String}
+         */
+        this.data_type = data_type;
+        
+        /**
+         * The type of message to send 
+         * and receive between Clients
+         * @type {Message}
+         */
+        this.message_type = message_type;
+        
+        /**
+         * Maximum amount of clients.
+         * 0 for no maximum.
+         * @type {Number}
+         */
+        this.max_clients = max_clients;
+        
+        /**
+         * Maximum amount of server rooms.
+         * 0 for no maximum.
+         * @type {Number}
+         */
+        this.max_rooms = max_rooms;
+        
+        /**
+         * How long in ms until a client 
+         * is considered timed out.
+         * 0 for no timeout.
+         * @type {Number}
+         */
+        this.client_timeout = client_timeout;
 
+        /**
+         * How often in ms to send a heartbeat to a client.
+         * @type {Number}
+         */
+        this.heartbeat = heartbeat;
+
+        /**
+         * An object that listens on a TCP or UDP port
+         * for incoming clients.
+         * @type {ServerListener}
+         */
+        this.server_listener = server_listener;
+        
+        /**
+         * Routes requests.
+         * @type {Function|Map}
+         */
+        this.router = router;
+        
         // required for buffer based message construction (UDP/TCP)
-        this.messageOptions = {
+        this.message_options = {
+            // what to append at the end of each message to clients
+            // and also what is expected at the end of each message
             eof: this.eof,
+            // utf8, etc
             encoding: this.encoding
         };
 
-        // components
-        let logHandle = options.logHandle || this.name;
-        this.logger = new Logger(logHandle, {level: "debug"});
-		this.clientManager = this.createClientManager({maxClients: this.maxClients});
-		this.roomManager = this.createRoomManager({maxRooms: this.maxRooms});
-        this.router = options.router || new Map();
+        /**
+         * An object that monitors server stats.
+         * @type {ServerMonitor}
+         */
+        this.monitor = new ServerMonitor();
 
-		// set the log handle of each component to the same name of the server
-		this.serverListener.logger.setName(logHandle);
-		this.clientManager.logger.setName(logHandle);
-		this.roomManager.logger.setName(logHandle);
+        /**
+         * Log handle.
+         * Also used for the context of component loggers.
+         * @type {String}
+         */
+        this.log_handle = `${this.host}:${this.port}`;
 
-		// handlers
-		this.attachServerListenerHandlers(this.serverListener);
-		this.attachClientManagerHandlers(this.clientManager);
-		this.attachRoomManagerHandlers(this.roomManager);
+        /**
+         * Logging object
+         * @type {Logger}
+         */
+        this.logger = new Logger(this.constructor.name, {
+            context: this.log_handle,
+            level: "debug"
+        });
 
-		// init
-		this.addDefaultRoutes();
+        /**
+         * Client manager
+         * @type {ClientManager}
+         */
+        this.client_manager = new ClientManager(this.max_clients);
+        
+        /**
+         * Room manager
+         * @type {ObjectManager}
+         */
+        this.room_manager = new ObjectManager(this.max_rooms);
+
+		//this.client_manager.logger.setContext(this.log_handle);
+		//this.room_manager.logger.setContext(this.log_handle);
+        
 		return this;
-    }
-    
-    /**
-     * Create a server listener based on its protocol type.
-     * @param {string} type 
-     * @param {object} [options={}] 
-     * @return {ServerListener|number} - return -1 if type not found
-     */
-    createServerListener(type, options = {}){
-        switch(type){
-            case Server.type.udp:
-                return new UdpServerListener(options);
-            case Server.type.tcp:
-                return new TcpServerListener(options);
-            case Server.type.http:
-            case Server.type.https:
-                return new HttpServerListener(options);
-            case Server.type.websocket:
-                return new WebSocketServerListener(options);
-        }
-        // return -1 since this.serverListener can be null
-        return -1;
     }
 
 	/**
 	 * Get the ServerListener
 	 * @return {ServerListener}
 	 */
-	get serverListener(){
+	get server_listener(){
 		return this._serverListener;
 	}
 	
@@ -147,44 +179,23 @@ class Server extends EventEmitter {
 	 * Validates the ServerListener.
 	 * It must have a defined host and port.
 	 * Will throw an error if the ServerListener is invalid.
-	 * @param {ServerListener} serverListener 
+	 * @param {ServerListener} server_listener 
 	 */
-	set serverListener(serverListener) {
-        if(serverListener === null){
+	set server_listener(server_listener) {
+        if(server_listener === null){
             return;
         }
-		if(!(serverListener instanceof ServerListener)){
+		if(!(server_listener instanceof ServerListener)){
 			throw new Error("ServerListener must be instanceof ServerListener");
 		}
-		if(!serverListener.host){
+		if(!server_listener.host){
 			throw new Error("ServerListener host is invalid");
 		}
-		if(isNaN(serverListener.port)){
+		if(isNaN(server_listener.port)){
 			throw new Error("ServerListener port is invalid");
 		}
-		this._serverListener = serverListener;
-	}
-
-	/**
-	 * Start the server by starting the listener. 
-	 * @return {Server}
-	 */
-	start(){
-        this.monitor.start();
-		this.serverListener.listen();
-		return this;
-	}
-
-	/**
-	 * Shut down the server listener
-	 * @return {Server}
-	 */
-	stop(){
-		this.clientManager.disconnectClients();
-		this.clientManager.empty();
-		this.serverListener.close();
-        this.monitor.stop();
-		return this;
+		this._serverListener = server_listener;
+		//this.server_listener.logger.setContext(this.log_handle);
 	}
 
 	/**
@@ -193,11 +204,11 @@ class Server extends EventEmitter {
 	 * "disconnect" events, along with an object
 	 * that extends Client, and some possible 
 	 * extra data about the initial connection.
-	 * @param {ServerListener} serverListener 
+	 * @param {ServerListener} server_listener 
 	 * @return {Server}
 	 */
-	attachServerListenerHandlers(serverListener){
-		serverListener.on('connect', this.handleClientConnection.bind(this));
+	attachServerListenerHandlers(server_listener){
+		server_listener.on('connect', this.handleClientConnection.bind(this));
 		return this;
 	}
 
@@ -214,7 +225,7 @@ class Server extends EventEmitter {
 		}
 
 		this.attachClientHandlers(client);
-        this.clientManager.addClient(client.id, client);
+        this.client_manager.add(client.id, client);
         this.emit('connect', client);
 		client.ping();
 		return this;
@@ -232,64 +243,24 @@ class Server extends EventEmitter {
      * @return {Server}
      */
     attachClientHandlers(client){
-		let self = this;
-		client.on('disconnnect', function(data){
-            self.emit('disconnnect', client, data);
+		client.on('disconnnect', (data) => {
+            this.emit('disconnnect', client, data);
 		});
-		client.on('reconnnect', function(){
-            self.emit('reconnnect', client);
+		client.on('reconnnect', () => {
+            this.emit('reconnnect', client);
 		});
-		client.on('timeout', function(){
-            self.emit('timeout', client);
+		client.on('timeout', () => {
+            this.emit('timeout', client);
 		});
-		client.on('message', function(message){
-            self.routeMessage(message, client);
-            self.emit('message', client, message);
+		client.on('message', (message) => {
+            this.routeMessage(message, client);
+            this.emit('message', client, message);
 		});
-		client.on('error', function(error){
-            self.emit('error', client, error);
-		});
-		client.on('maxError', function(error){
-            self.emit('maxError', client, error);
+		client.on('error', (error) => {
+            this.emit('error', client, error);
 		});
         return this;
     }
-
-	/**
-	 * Create the client manager
-	 * @param {object} [options]
-	 * @return {ClientManager}
-	 */
-	createClientManager(options){
-		return new ClientManager(options);
-	}
-
-	/**
-	 * Attach event handlers to the client manager
-	 * @param {ClientManager} clientManager
-	 * @return {Server}
-	 */
-	attachClientManagerHandlers(clientManager){
-		return this;
-	}
-
-	/**
-	 * Create the room manager
-	 * @param {object} [options]
-	 * @return {RoomManager}
-	 */
-	createRoomManager(options){
-		return new RoomManager(options);
-	}
-
-	/**
-	 * Attach event handlers to the room manager
-	 * @param {RoomManager} roomManager
-	 * @return {Server}
-	 */
-	attachRoomManagerHandlers(roomManager){
-		return this;
-	}	
 
     /////////////////////////////////////
     // Messages
@@ -297,18 +268,18 @@ class Server extends EventEmitter {
     
     /**
      * Create a message to send to a client.
-     * @param {object} [options={}] 
+     * @param {Object} [options={}] 
      * @return {Message}
      */
     createMessage(options = {}){
-        Object.extend(options, this.messageOptions, options);
-        return new this.message(options);
+        Object.extend(options, this.message_options, options);
+        return new this.message_type(options);
     }
 
     /**
      * Add a route to the router
-     * @param {string} route 
-     * @param {function} handler - function to handle the route
+     * @param {String} route 
+     * @param {Function} handler - function to handle the route
      * @return {Server}
      */
     addRoute(route, handler){
@@ -318,8 +289,8 @@ class Server extends EventEmitter {
 
     /**
      * Get a route callback from the router
-     * @param {string} route 
-     * @return {function}
+     * @param {String} route 
+     * @return {Function}
      */
     getRoute(route){
         return this.router.get(route);
@@ -327,7 +298,7 @@ class Server extends EventEmitter {
 
     /**
      * Delete a route from the router.
-     * @param {string} route 
+     * @param {String} route 
      * @return {Server}
      */
     deleteRoute(route){
@@ -369,21 +340,21 @@ class Server extends EventEmitter {
      * Send the msg to the other client, if found.
 	 * Return a Message with the whispered msg or error.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.clientId
-	 * @param {string} message.data.msg
+	 * @param {Object} message.data
+	 * @param {String} message.data.clientId
+	 * @param {String} message.data.msg
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageClientWhisper(message, client){
         let msg = this.createMessage({route: "/client/whisper"});
-		let toClient = this.clientManager.getClient(message.data.clientId);
-		if(toClient){
+		let to_client = this.client_manager.get(message.data.clientId);
+		if(to_client){
 			msg.setData({
 				from: client.id,
 				msg: msg.data.msg
 			});
-            toClient.writeMessage(msg.serialize());
+            to_client.writeMessage(msg.serialize());
         }
         else {
             msg.setError("Client not found");
@@ -396,10 +367,10 @@ class Server extends EventEmitter {
      * Immediately join the room if it is added.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.name
-	 * @param {string} [message.data.password]
-	 * @param {boolean} [message.data.private]
+	 * @param {Object} message.data
+	 * @param {String} message.data.name
+	 * @param {String} [message.data.password]
+	 * @param {Boolean} [message.data.private]
 	 * @param {Client} client
 	 * @return {Message}
 	 */
@@ -407,17 +378,17 @@ class Server extends EventEmitter {
         let msg = this.createMessage({route: "/room/add"});
 
 		// check if room exists
-		let room = this.roomManager.getRoom(message.data.name);
+		let room = this.room_manager.get(message.data.name);
 		if(room){
 			msg.setError("Room already exists");
 			return msg;
 		}
 
         message.data.owner = client.id;
-		room = this.roomManager.createRoom(message.data);
+		room = new Room(message.data);
 		if(room){
-            room.addClient(client.id, client);
-            this.roomManager.addRoom(room.name, room);
+            room.add(client.id, client);
+            this.room_manager.add(room.name, room);
 		}
 		else {
 			msg.setError("Failed to create room");
@@ -429,14 +400,14 @@ class Server extends EventEmitter {
      * Handle a request to delete a room.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.name
+	 * @param {Object} message.data
+	 * @param {String} message.data.name
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomDelete(message, client){
         let msg = this.createMessage({route: "/room/delete"});
-		let room = this.roomManager.getRoom(message.data.name);
+		let room = this.room_manager.get(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -444,7 +415,7 @@ class Server extends EventEmitter {
             msg.setError("You are not the father");
         }
 		else {
-            this.roomManager.deleteRoom(message.data.name)
+            this.room_manager.delete(message.data.name)
         }
 		return msg;
 	}
@@ -453,14 +424,14 @@ class Server extends EventEmitter {
      * Handle a request to empty a room.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.name
+	 * @param {Object} message.data
+	 * @param {String} message.data.name
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomEmpty(message, client){
         let msg = this.createMessage({route: "/room/empty"});
-		let room = this.roomManager.getRoom(message.data.name);
+		let room = this.room_manager.get(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -477,14 +448,14 @@ class Server extends EventEmitter {
      * Handle a request to get all rooms.
 	 * Return a Message with all rooms.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {number} message.data.index
-	 * @param {number} message.data.max
+	 * @param {Object} message.data
+	 * @param {Number} message.data.index
+	 * @param {Number} message.data.max
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomGetAll(message, client){
-		let rooms = this.roomManager.serialize(message.data.index, message.data.max);
+		let rooms = this.room_manager.serialize(message.data.index, message.data.max);
 		return this.createMessage({
 			route: "/room/get/all",
 			data: {rooms: rooms}
@@ -495,10 +466,10 @@ class Server extends EventEmitter {
      * Handle a request to get a room.
 	 * Return a Message with the room.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} [message.data.name] - room name if getting single room
-	 * @param {number} [message.data.max=25] - max number of rooms if getting all rooms
-	 * @param {number} [message.data.offset=0] - offset to start at if getting all rooms
+	 * @param {Object} message.data
+	 * @param {String} [message.data.name] - room name if getting single room
+	 * @param {Number} [message.data.max=25] - max number of rooms if getting all rooms
+	 * @param {Number} [message.data.offset=0] - offset to start at if getting all rooms
 	 * @param {Client} client
 	 * @return {Message}
 	 */
@@ -507,7 +478,7 @@ class Server extends EventEmitter {
 
         // get a room by name
         if(message.data && message.data.name){
-            let room = this.roomManager.getRoom(message.data.name);
+            let room = this.room_manager.get(message.data.name);
             if(room){
                 msg.setData(room.serialize());
             }
@@ -522,7 +493,7 @@ class Server extends EventEmitter {
                 offset: 0
             };
             Object.assign(options, message.data);
-            msg.setData(this.roomManager.serialize(options.max, options.offset));
+            msg.setData(this.room_manager.serialize(options.max, options.offset));
         }
 
         return msg;
@@ -532,15 +503,15 @@ class Server extends EventEmitter {
      * Handle a request to join a room.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.room
-	 * @param {string} [message.data.password]
+	 * @param {Object} message.data
+	 * @param {String} message.data.room
+	 * @param {String} [message.data.password]
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomJoin(message, client){
         let msg = this.createMessage({route: "/room/join"});
-		let room = this.roomManager.getRoom(message.data.name);
+		let room = this.room_manager.get(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -554,19 +525,19 @@ class Server extends EventEmitter {
      * Handle a request to leave a room.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.name
+	 * @param {Object} message.data
+	 * @param {String} message.data.name
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomLeave(message, client){
         let msg = this.createMessage({route: "/room/leave"});
-		let room = this.roomManager.getRoom(message.data.name);
+		let room = this.room_manager.get(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
 		else {
-            room.deleteClient(client.id)
+            room.delete(client.id)
         }
 		return msg;
 	}
@@ -575,16 +546,16 @@ class Server extends EventEmitter {
      * Handle a request to ban a client from a room.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.name
-	 * @param {string} message.data.clientId
-	 * @param {string} message.data.msg
+	 * @param {Object} message.data
+	 * @param {String} message.data.name
+	 * @param {String} message.data.clientId
+	 * @param {String} message.data.msg
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomBanClient(message, client){
         let msg = this.createMessage({route: "/room/client/ban"});
-        let room = this.roomManager.getRoom(message.data.name);
+        let room = this.room_manager.get(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -601,19 +572,19 @@ class Server extends EventEmitter {
      * Handle a request to get a room's client list.
 	 * Return a Message with the client list.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.name
+	 * @param {Object} message.data
+	 * @param {String} message.data.name
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomGetClients(message, client){
         let msg = this.createMessage({route: "/room/client/get"});
-		let room = this.roomManager.getRoom(message.data.name);
+		let room = this.room_manager.get(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
         else {
-            msg.setData(room.clientManager.serialize());
+            msg.setData(room.client_manager.serialize());
         }
         return msg;
 	}
@@ -622,16 +593,16 @@ class Server extends EventEmitter {
      * Handle a request to kick a client from a room.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {object} message.data
-	 * @param {string} message.data.name
-	 * @param {string} message.data.clientId
-	 * @param {string} message.data.msg
+	 * @param {Object} message.data
+	 * @param {String} message.data.name
+	 * @param {String} message.data.clientId
+	 * @param {String} message.data.msg
 	 * @param {Client} client
 	 * @return {Message}
 	 */
 	handleMessageRoomKickClient(message, client){
         let msg = this.createMessage({route: "/room/client/kick"});
-        let room = this.roomManager.getRoom(message.data.name);
+        let room = this.room_manager.get(message.data.name);
 		if(!room){
             msg.setError("Invalid room");
         }
@@ -656,20 +627,39 @@ class Server extends EventEmitter {
         }
 		let route = this.router.get(message.route);
 		if(route){
-			let responseMessage = route(message, client);
-            if(responseMessage){
-                client.writeMessage(responseMessage);
+			let response_message = route(message, client);
+            if(response_message){
+                client.writeMessage(response_message);
             }
 		}
 		return this;
+    }
+    
+	/**
+     * Add default routes.
+     * Attach server listener handlers.
+	 * Start the server by starting the listener. 
+	 * @return {Server}
+	 */
+	start(){
+        this.addDefaultRoutes();
+		this.attachServerListenerHandlers(this.server_listener);
+        this.monitor.start();
+		this.server_listener.listen();
+		return this;
+	}
+
+	/**
+	 * Shut down the server listener
+	 * @return {Server}
+	 */
+	stop(){
+		this.client_manager.disconnectClients();
+		this.client_manager.empty();
+		this.server_listener.close();
+        this.monitor.stop();
+		return this;
 	}
 }
-Server.type = {
-    udp: "udp",
-    tcp: "tcp",
-    http: "http",
-    https: "https",
-    websocket: "websocket"
-};
 
 module.exports = Server;

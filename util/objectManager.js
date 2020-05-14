@@ -8,7 +8,6 @@ const Logger = require('@voliware/logger');
  * Provides an optional max object limit.
  * Can serialize all objects in the collection,
  * if each object has a serialize() method.
- * Can create new objects if the object constructor is set.
  * Logs all object management in debug mode.
  * @extends {EventEmitter}
  */
@@ -16,67 +15,131 @@ class ObjectManager extends EventEmitter {
 
 	/**
 	 * Constructor
-	 * @param {object} [options={}]
-	 * @param {string} [options.logHandle="objectmanager"]
-	 * @param {function} [options.objectClass=null]
-	 * @param {number} [options.maxObjects=0]
+	 * @param {Number} [max_objects=0]
 	 * @return {ObjectManager}
 	 */
-	constructor(options = {}){
+	constructor(max_objects = 0){
         super();
-        this.logger = new Logger(options.logHandle || "ObjectManager", {level: "debug"});
-		this.maxObjects = options.maxObjects || 0;
-		this.objects = {};
-		this.objectCount;
-		this.objectClass = options.objectClass || null;
-		this.requiresNewSerialize = true;
+
+        /**
+         * The maximum number of objects to manage.
+         * 0 for no limit.
+         * @type {Number}
+         */
+        this.max_objects = max_objects;
+        
+        /**
+         * The object collection mapped by an id.
+         * @type {Object}
+         */
+        this.objects = {};
+        
+        /**
+         * The current number of objects.
+         * @type {Number}
+         */
+        this.count = 0;
+
+        /**
+         * The number of objects that have been
+         * added or created in total.
+         * @type {Number}
+         */
+        this.count_total = 0;
+
+        /**
+         * The highest number of objects at one time.
+         * @type {Number}
+         */
+        this.count_peak = 0;
+
+        /**
+         * Logging object
+         * @type {Logger}
+         */
+        this.logger = new Logger("ObjectManager", {level: "debug"});
+
 		return this;
 	}
+    
+    /**
+     * Update the count_peak stat
+     * @return {ObjectManager}
+     */
+    updatePeakCount(){
+        if(this.count > this.count_peak){
+            this.count_peak = this.count;
+        }
+        return this;
+    }
 
-	/**
-	 * Get the object count
-	 * @return {number}
-	 */
-	get objectCount (){
-		return Object.keys(this.objects).length;
+    /**
+     * Increment the count_total state
+     * @return {ObjectManager}
+     */
+    incrementTotal(){
+        this.count_total++;
+        return this;
     }
     
     /**
-     * Create an object from the manager.
-     * @return {any}
+     * Callback when objects are added.
+     * @param {Object} object 
+	 * @return {ObjectManager}
      */
-    createObject(){
-        return this.objectClass ? new this.objectClass(...arguments) : {};
+    onAddObject(object){
+        return this;
+    }
+    
+    /**
+     * Callback when objects are deleted.
+     * @param {Object} object 
+	 * @return {ObjectManager}
+     */
+    onDeleteObject(object){
+        return this;
+    }
+    
+    /**
+     * Callback when objects are updated.
+     * @param {Object} object 
+	 * @return {ObjectManager}
+     */
+    onUpdateObject(object){
+        return this;
     }
 
-	/**
+    /**
 	 * Add an object if max objects is not reached.
-	 * @param {number|string} id
-	 * @param {object} obj
+	 * @param {Number|String} id
+	 * @param {Object} obj
 	 * @return {ObjectManager}
 	 */
-	addObject(id, obj){
-		if(!this.maxObjects || this.objectCount !== this.maxObjects){
+	addOne(id, obj){
+		if(!this.max_objects || this.count !== this.max_objects){
 			this.objects[id] = obj;
             this.logger.info(`Added object ${id}`);
         }
         else {
-            this.logger.info(`Max objects reached (${this.maxObjects})`);
+            this.logger.info(`Max objects reached (${this.max_objects})`);
         }
+        this.count++;
+        this.count_total++;
+        this.updatePeakCount();
+        this.onAddObject(obj);
 		return this;
-	}
-
+    }
+    
 	/**
-	 * Add an array of objects or an object of objects.
-     * They must have an .id property.
-	 * @param {object[]|object} objects
+	 * Add an array or collection of objects
+	 * @param {Object|Object[]} objects
 	 * @return {ObjectManager}
 	 */
-	addObjects(objects){
+    addMany(objects){
         if(Array.isArray(objects)){
             array.forEach(element => {
                 if(typeof element.id !== "undefined"){
-                    this.addObject(element.id, element);
+                    this.addOne(element.id, element);
                 }
             });
         }
@@ -84,67 +147,120 @@ class ObjectManager extends EventEmitter {
             for(let k in objects){
                 let obj = objects[k];
                 if(typeof obj.id !== "undefined"){
-                    this.addObject(obj.id, obj);
+                    this.addOne(obj.id, obj);
                 }
             }
+        }
+		return this;
+    }
+
+	/**
+     * Add a single object, an array of objects,
+     * or an object of objects. If a collection,
+     * interal objects must have an "id" property.
+	 * @param {Number|String|Object|Object[]} id - if passing single object, it's id
+     *                                             otherwise, array or object of objects
+	 * @param {object[]|object} [objects] - if passing a single object, the object
+	 * @return {ObjectManager}
+     * @example 
+     * add(554, {});
+     * add([{id:1},..]);
+     * add({a: {id:1},...});
+	 */
+	add(){
+		if(!this.max_objects && this.count !== this.max_objects){
+            this.logger.info(`Max objects reached (${this.max_objects})`);
+        }
+        else if(typeof arguments[0] === "number" || typeof arguments[0] === "string"){
+            this.addOne(...arguments);
+        }
+        else {
+            this.addMany(...arguments);
         }
 		return this;
 	}
 
 	/**
 	 * Delete an object
-	 * @param {number|string} id
+	 * @param {Number|String} id
 	 * @return {ObjectManager}
 	 */
-	deleteObject(id){
+	delete(id){
 		delete this.objects[id];
         this.logger.info(`Deleted object ${id}`);
+        this.count--;
+        this.onDeleteObject(id);
 		return this;
+    }
+
+    /**
+     * Delete all objects
+	 * @return {ObjectManager}
+	 */
+    deleteAll(){
+        for(let k in this.objects){
+            this.delete(k);
+        }
+        return this;
     }
 
 	/**
 	 * Get an object by id
-	 * @param {number|string} id
+	 * @param {Number|String} id
 	 * @return {*}
 	 */
-	getObject(id){
+	getOne(id){
 		this.logger.debug(`Get object ${id}`);
 		return this.objects[id];
     }
     
     /**
      * Get all objects
-     * @return {object}
+     * @return {Object}
      */
-    getObjects(){
+    getAll(){
         return this.objects;
+    }
+
+    /**
+     * Get one or all objects.
+     * If no id is passed, gets all objects.
+     * If any id is passed, tries to get that object.
+     * @param {Number|String} [id]
+     * @return {Object}
+     */
+    get(id){
+        return typeof id === "undefined" ? this.getAll() : this.getOne(id);
     }
 
 	/**
 	 * Update an object by replacing it.
-	 * @param {number|string} id
-	 * @param {object} obj
+	 * @param {Number|String} id
+	 * @param {Object} obj
 	 * @return {ObjectManager}
 	 */
-	updateObject(id, obj){
+	update(id, obj){
 		this.objects[id] = obj;
 		this.logger.debug(`Update object ${id}`);
+        this.onUpdateObject(obj);
 		return this;
 	}
     
     /**
-     * Remove all objects
+     * Remove all objects.
+     * Does not call delete on them.
      * @return {ObjectManager}
      */
     empty(){
         this.objects = [];
+        this.count = 0;
         return this;
     }
     
     /**
      * Get a random and unique id.
      * Return null if it could not be created.
-     * @return {string|null}
+     * @return {String|Null}
      */
     getUniqueRandomId(){
         let id = null;
@@ -164,7 +280,7 @@ class ObjectManager extends EventEmitter {
 	 * @return {object[]}
 	 */
 	serialize(max = 0, offset = 0){
-        let serializedObjects = [];
+        let serialized_objects = [];
         for(let k in this.objects){
             // skip until offset
             if(offset > 0){
@@ -175,7 +291,7 @@ class ObjectManager extends EventEmitter {
             // serialize object
             let obj = this.objects[k];
 			if(obj.serialize){
-				serializedObjects.push(obj.serialize());
+				serialized_objects.push(obj.serialize());
             }
 
             // quit at max
@@ -186,7 +302,11 @@ class ObjectManager extends EventEmitter {
                 }
             }
         }
-		return serializedObjects;
+		return {
+            count: this.count,
+            objects: serialized_objects,
+            max: this.max_objects
+        };
 	}
 }
 

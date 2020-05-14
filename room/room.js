@@ -11,28 +11,64 @@ class Room extends ClientManager {
 
 	/**
 	 * Constructor
-	 * @param {object} options
-	 * @param {string} [options.owner=""]
-	 * @param {boolean} [options.broadcastLeavers=false]
-	 * @param {number} [options.private=0]
-	 * @param {string} [options.password=""]
-	 * @param {string} [options.name="Room"]
+	 * @param {Object} options
+	 * @param {String} [options.owner=""]
+	 * @param {Boolean} [options.broadcastLeavers=false]
+	 * @param {Number} [options.hidden=0]
+	 * @param {String} [options.password=""]
+	 * @param {String} [options.name="Room"]
+	 * @param {Number} [options.max_objects=0]
 	 * @return {Room}
 	 */
-	constructor(options = {}){
-		super(options);
-		this.owner = options.owner || "";
-		this.password = options.password || "";
-		this.private = options.private || false;
-        this.name = options.name || "Room";
-		this.logger.logHandle += ` (${this.name})`;
+	constructor({
+        owner = "",
+        password = "",
+        hidden = false,
+        name = "Room",
+        max_objects = 0
+    }){
+        super(max_objects);
+        
+        /**
+         * Id of client owning the room.
+         * @type {String}
+         */
+        this.owner = owner;
+        
+        /**
+         * Password to join the room
+         * @type {String}
+         */
+        this.password = password;
+        
+        /**
+         * Whether the room is visible to anyone
+         * @type {Boolean}
+         */
+        this.hidden = hidden;
+        
+        /**
+         * Name of the room
+         * @type {String}
+         */
+        this.name = name;
+
+        this.logger.log_handle += ` (${this.name})`;
+        
 		// temp till i think about name vs id
 		this.id = this.name;
 
-		// used for generating unique message ids
-		this.lastMessageTime = 0;
-        this.lastMessageTimeCounter = 0;
+        /**
+         * Number of messages sent.
+         * Also serves as next message id.
+         * @type {Number}
+         */
+		this.message_counter = 0;
         
+        /**
+         * Message router
+         * @type {Map}
+         */
         this.router = new Map();
 
 		return this;
@@ -40,20 +76,20 @@ class Room extends ClientManager {
 
 	/**
 	 * Check password
-	 * @param {string} password
-	 * @return {boolean}
+	 * @param {String} password
+	 * @return {Boolean}
 	 */
 	checkPassword(password){
-		return this.settings.password === "" || this.settings.password === password;
+		return this.password === "" || this.password === password;
 	}
 
 	/**
 	 * Lock a room
-	 * @param {string} password
+	 * @param {String} password
 	 * @return {Room}
 	 */
 	lock(password){
-		this.settings.password = password;
+		this.password = password;
 		return this;
 	}
 
@@ -62,19 +98,19 @@ class Room extends ClientManager {
 	 * @return {Room}
 	 */
 	unlock(){
-		this.settings.password = "";
+		this.password = "";
 		return this;
 	}
 
 	/**
 	 * Join a room
 	 * @param {Client} client
-	 * @param {string} [password=""]
-	 * @return {boolean}
+	 * @param {String} [password=""]
+	 * @return {Boolean}
 	 */
 	join(client, password = ""){
 		if(!this.isClientBanned(client.id) && this.checkPassword(password)){
-			this.addClient(client.id, client);
+			this.add(client.id, client);
 			// this.broadcast();
             return true;
 		}
@@ -83,8 +119,8 @@ class Room extends ClientManager {
 
 	/**
 	 * Checks if a client owns a room
-	 * @param {string} owner
-	 * @return {boolean}
+	 * @param {String} owner
+	 * @return {Boolean}
 	 */
 	isOwner(owner){
 		return owner === this.owner;
@@ -96,7 +132,7 @@ class Room extends ClientManager {
 	 * @return {Room}
 	 */
 	privatize(){
-		this.private = true;
+		this.hidden = true;
 		return this;
 	}
 
@@ -106,25 +142,9 @@ class Room extends ClientManager {
 	 * @return {Room}
 	 */
 	deprivatize(){
-		this.private = false;
+		this.hidden = false;
 		return this;
 	}
-
-	/**
-	 * Convert the room into an object
-	 * @return {null|object}
-	 */
-	serialize(){
-		return {
-			maxClients: this.maxClients,
-			clientCount: this.clientCount,
-			clients: this.serializeClients(),
-            privatized: this.private ? 1 : 0,
-			locked: this.password === "" ? 0 : 1,
-			name: this.name,
-			id: this.id
-		};
-    }
     
     /**
      * Attach handlers to a client
@@ -133,9 +153,8 @@ class Room extends ClientManager {
      */
     attachClientHandlers(client){
         super.attachClientHandlers(client);
-        let self = this;
-        client.on('message', function(message){
-            self.routeMessage(message, client);
+        client.on('message', (message) => {
+            this.routeMessage(message, client);
         });
         // leaving this here for knowledge:
         // if you create clients and add them to a room,
@@ -152,10 +171,10 @@ class Room extends ClientManager {
      * Add a client.
 	 * Send a msg to the client about the room.
      * Broadcast to everyone else that the client has joined.
-     * @param {string} id 
+     * @param {String} id 
      * @param {Client} client 
      */
-    addClient(id, client){
+    add(id, client){
         super.addObject(id, client);
         // client.writeJson({
         //     route: Room.cmd.info,
@@ -174,11 +193,11 @@ class Room extends ClientManager {
     /**
      * Delete a client.
      * Broadcast that the client is deleted.
-     * @param {string} id 
+     * @param {String} id 
      * @param {Client} client 
      */
-	deleteClient(id){
-		super.deleteClient(id);
+	delete(id){
+		super.delete(id);
 		// this.broadcastJson({
 		// 	route: Room.cmd.client.delete,
 		// 	data: {
@@ -209,7 +228,7 @@ class Room extends ClientManager {
      * If successful, will broadcast to everyone including the client.
 	 * Return a Message with ok or err.
 	 * @param {Message} message
-	 * @param {string} message.text
+	 * @param {String} message.text
      * @param {Client} client
 	 * @return {Message}
 	 */
@@ -221,7 +240,7 @@ class Room extends ClientManager {
                 text: message.text,
                 user: client.name,
 				time: time,
-				id: this.generateMessageId(client.id, time)
+				id: this.message_counter++
             }
         });
         // this.broadcastJson(msg.serialize());
@@ -250,7 +269,7 @@ class Room extends ClientManager {
      * Handle a request to lock a room.
 	 * Return a Message with ok or err.
      * @param {Message} message
-	 * @param {string} message.password
+	 * @param {String} message.password
 	 * @param {Client} client
 	 * @return {Message}
 	 */
@@ -321,6 +340,17 @@ class Room extends ClientManager {
         }
 		return this;
 	}
+
+	/**
+	 * Convert the room into an object
+	 * @return {Object}
+	 */
+	serialize(){
+        let data = super.serialize();
+		data.privatized = this.hidden ? 1 : 0;
+        data.locked = this.password === "" ? 0 : 1;
+        return data;
+    }
 }
 
 module.exports = Room;

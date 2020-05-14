@@ -10,11 +10,19 @@ class JsonMessage extends Message {
 
     /**
      * Constructor
-     * @param {object} [options] 
+	 * @param {Object} [options]
+	 * @param {Number} [options.route=null] - command
+	 * @param {Object} [options.data=null] - data
+	 * @param {Number} [options.status=Message.status.ok] - status
      * @return {Message}
      */
-    constructor(options){
-        super(options);
+    constructor({
+        route = "",
+        data = null,
+        status = Message.status.ok
+    })
+    {
+        super({route, data, status});
         return this;
     }
 
@@ -22,18 +30,17 @@ class JsonMessage extends Message {
      * Parse a JSON string into an object,
      * and set all Message properties from
      * that object.
-     * @param {string} string 
+     * @param {String} string 
      * @return {Message}
      */
     fromJsonString(string){
 		let obj = null;
 		try {
-            // console.log(string)
 			obj = JSON.parse(string);
 		}
 		catch(error){
 			console.error("fromJsonString: failed to parse JSON");
-            // console.error(error);
+            console.error(error);
         }
 
         if(obj){
@@ -47,7 +54,7 @@ class JsonMessage extends Message {
      * Convert Message properties into a 
      * simple object, and stringify that
      * object into a JSON string.
-     * @return {string|null} - null if it fails
+     * @return {String|Null} - null if it fails
      */
     toJsonString(){
 		let obj = this.toObject()
@@ -64,7 +71,7 @@ class JsonMessage extends Message {
 
     /**
      * Serialize the Message into a JSON string.
-     * @return {string|null}
+     * @return {String|Null}
      */
     serialize(){
         return this.toJsonString();
@@ -72,7 +79,7 @@ class JsonMessage extends Message {
 
     /**
      * Deserialize a string into the Message.
-     * @param {string} data 
+     * @param {String} data 
      * @return {Message}
      */
     deserialize(data){
