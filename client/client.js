@@ -448,6 +448,7 @@ class Client extends EventEmitter {
     // Buffer Support
     // The following buffer functions are only needed if 
     // the client must use a buffer to receive data
+    // TODO: replace with a @voliware/data-transform
     ////////////////////////////////////////////////////////
 
     /**

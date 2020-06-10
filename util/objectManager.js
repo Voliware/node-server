@@ -168,10 +168,7 @@ class ObjectManager extends EventEmitter {
      * add({a: {id:1},...});
 	 */
 	add(){
-		if(!this.max_objects && this.count !== this.max_objects){
-            this.logger.info(`Max objects reached (${this.max_objects})`);
-        }
-        else if(typeof arguments[0] === "number" || typeof arguments[0] === "string"){
+        if(typeof arguments[0] === "number" || typeof arguments[0] === "string"){
             this.addOne(...arguments);
         }
         else {

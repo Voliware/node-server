@@ -14,7 +14,7 @@ class WebSocketServer extends Server {
      * @param {Object} [options={}]
      * @return {WebSocketServer}
      */
-    constructor({message = JsonMessage, port = 81}){
+    constructor({message = JsonMessage, port = 443}){
         super({port, message});
         this.server_listener = new WebSocketServerListener({
             host: this.host,

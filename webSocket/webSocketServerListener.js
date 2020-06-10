@@ -63,16 +63,15 @@ class WebSocketServerListener extends HttpServerListener {
 	 * @return {WebSocketServerListener}
 	 */
 	attachWebSocketServerHandlers(){
-		let self = this;
-		this.webSocketServer.on('connection', function(socket, req) {
-			self.logger.info('WebSocket connected');
-			let client = self.createClient(socket);
-			self.emit('connect', client, req);
+		this.webSocketServer.on('connection', (socket, req) => {
+			this.logger.info('WebSocket connected');
+			let client = this.createClient(socket);
+			this.emit('connect', client, req);
 			// on close, emit disconnect
 			// note: this listens on the main socket, not the socket wrapper.. 
 			socket.on('close', function(code, reason){
-				self.logger.debug(`WebSocket closed with code: ${code}, reason: ${reason ? reason : "none"}`);
-				self.emit('disconnect', {code, reason});
+				this.logger.debug(`WebSocket closed with code: ${code}, reason: ${reason ? reason : "none"}`);
+				this.emit('disconnect', {code, reason});
 			});
 		});
 		return this;

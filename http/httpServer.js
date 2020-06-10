@@ -25,7 +25,7 @@ class HttpServer extends Server {
     constructor({
         port = 80,
         router = Router(),
-        public_path = "public",
+        public_path = Path.join(__dirname, '..', "public"),
         public_index = "index.html"
     })
     {
@@ -35,7 +35,7 @@ class HttpServer extends Server {
          * Public file path to public files
          * @type {String}
          */
-        this.public_path = Path.join(__dirname, '..', public_path);
+        this.public_path = public_path;
 
         /**
          * Public index HTML file.
@@ -419,18 +419,6 @@ class HttpServer extends Server {
                 reject(error);
             });
         });
-    }
-
-    /**
-     * Override the client whisper handler
-     * to instead do nothing.
-     * @param {Message} message 
-     * @param {HttpClient} client 
-     * @return {Null}
-     */
-    handleMessageClientWhisper(message, client){
-        this.logger.error("Cannot whisper to HTTP clients");
-        return null;
     }
 
     /**

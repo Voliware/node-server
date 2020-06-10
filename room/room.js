@@ -1,5 +1,4 @@
 const ClientManager = require('./../client/clientManager');
-const Message = require ('../message/message');
 
 /**
  * A client manager with some extra functionality.
@@ -305,7 +304,7 @@ class Room extends ClientManager {
 	/**
      * Handle a request to unlock a room.
 	 * Return a Message with ok or err.
-	 * @param {Message} message
+	 * @param {Message} messageF
 	 * @param {Client} client
 	 * @return {Message}
 	 */
