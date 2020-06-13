@@ -17,9 +17,9 @@ const UdpClient = require('./udp/udpClient');
 const UdpServer = require('./udp/udpServer');
 const UdpSocket = require('./udp/udpSocket');
 const UdpServerListener = require('./udp/udpServerListener');
-const WebSocketClient = require('./websocket/webSocketClient');
-const WebSocketServer = require('./websocket/webSocketServer');
-const WebSocketServerListener = require('./websocket/webSocketServerListener');
+const WebSocketClient = require('./webSocket/webSocketClient');
+const WebSocketServer = require('./webSocket/webSocketServer');
+const WebSocketServerListener = require('./webSocket/webSocketServerListener');
 
 module.exports = {
     Client,

@@ -17,19 +17,20 @@ class HttpServer extends Server {
     /**
      * Constructor
      * @param {Object} [options={}]
-     * @param {String} [options.log_handle="HttpServer"]
+     * @param {String} [options.host="localhost"]
      * @param {String} [options.public_path="public"]
      * @param {String} [options.public_index="index.html"]
      * @return {HttpServer}
      */
     constructor({
+        host = "localhost",
         port = 80,
         router = Router(),
         public_path = Path.join(__dirname, '..', "public"),
         public_index = "index.html"
     })
     {
-        super({port, router});
+        super({host, port, router});
 
         /**
          * Public file path to public files

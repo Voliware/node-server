@@ -12,10 +12,18 @@ class UdpServer extends Server {
     /**
      * Constructor
      * @param {Object} [options={}]
+     * @param {String} [options.host="localhost"]
+     * @param {Number} [options.port=4444]
+     * @param {Message} [options.message=BufferJsonMessage]
      * @return {UdpServer}
      */
-    constructor({port = 4444, message = BufferJsonMessage}){
-        super({port, message});
+    constructor({
+        host = "localhost",
+        message = BufferJsonMessage, 
+        port = 4444
+    })
+    {
+        super({host, port, message});
         this.server_listener = new UdpServerListener({
             host: this.host, 
             port: this.port

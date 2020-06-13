@@ -11,7 +11,7 @@ class AppExample {
      * @return {AppExample}
      */
     constructor(){
-        this.webSocketServer = new NodeServer.WebSocketServer({port: 443});
+        this.webSocketServer = new NodeServer.WebSocketServer({port: 2222});
         this.httpServer = new NodeServer.HttpServer({port: 80});
         this.tcpServer = new NodeServer.TcpServer({
             port: 666,
