@@ -145,18 +145,45 @@ class HttpServer extends Server {
     }
 
     /**
+     * Get the stats for a file
+     * @param {String} filepath
+     * @returns {Promise<Fs.Stats>} 
+     */
+    getFileStats(filepath){
+        return new Promise((resolve, reject) => {
+            Fs.stat(filepath, (err, stats) => {
+                if(err){
+                    reject(err);
+                }
+                else {
+                    resolve(stats);
+                }
+            });
+        });
+    }
+
+    /**
      * Create a response with a file.
+     * @todo Add caching here - if a file is requested very often, it could go into RAM
      * @param {String} filepath 
      * @param {Response} response 
      * @return {Response}
      */
-    sendFile(filepath, response){
+    async sendFile(filepath, response){
         try{
+            let stats = await this.getFileStats(filepath);
             let readable = Fs.createReadStream(filepath);
-            let contentType = Mime.contentType(filepath);
-            response.setHeader('Content-Type', contentType);
-            response.statusCode = 200;
+            let ext = Path.extname(filepath);
+            let contentType = Mime.contentType(ext);
+            response.on('error', (err) => {
+                readable.end();
+            });
             readable.pipe(response);
+            response.setHeader('Content-Type', contentType);
+            response.setHeader('Content-Length', stats.size);
+            response.setHeader('X-Content-Type-Options', 'nosniff')
+            response.setHeader('Server', 'Voliware');
+            response.statusCode = 200;
         }
         catch(error){
             return this.sendStatusCode(response, 404);
@@ -192,9 +219,9 @@ class HttpServer extends Server {
 
     /**
      * Find and register static public files.
-     * This will block while looping through
-     * the public path directory and recursively
-     * add each file to the static map.
+     * This will block while looping through the public path directory and 
+     * recursively add each file to the static map.
+     * @todo Add file size, stats, mime, to each entry
      * @param {String} path 
      * @return {HttpServer}
      */
@@ -261,8 +288,7 @@ class HttpServer extends Server {
     }
 
     /**
-     * Get a static file from the map
-     * or from searching the FS.
+     * Get a static file from the map or from searching the FS.
      * @param {String} url 
      * @return {Null|String}
      */
@@ -373,11 +399,9 @@ class HttpServer extends Server {
     }
 
     /**
-     * Parse a string of data, aka "body",
-     * using the request headers to determine
-     * the type of data. Returns the best
-     * matching type of data based on 
-     * the Content-Type header.
+     * Parse a string of data, aka "body", using the request headers to 
+     * determine the type of data. Returns the best matching type of 
+     * data based on  the Content-Type header.
      * @param {String} body 
      * @param {Request} request 
      * @return {Object|String}
@@ -390,7 +414,7 @@ class HttpServer extends Server {
                     return JSON.parse(body);
                 }
                 catch(e){
-                    return {};
+                    return body;
                 }
             default:
                 return body;
@@ -398,12 +422,9 @@ class HttpServer extends Server {
     }
     
     /**
-     * Get request data from an HTTP request.
-     * This returns a promise as data will
-     * come over the client socket over some
-     * period of time - ie it is not all 
-     * availalble immediately when the request
-     * is received.
+     * Get request data from an HTTP request. This returns a promise as data 
+     * will come over the client socket over some period of time - ie it is 
+     * not all  availalble immediately when the request is received.
      * @param {Request} request 
      * @return {Promise}
      */
@@ -424,10 +445,9 @@ class HttpServer extends Server {
 
     /**
      * Route a request.
-     * First try to route a user defined request,
-     * such as /user/dashboard/.
-     * If not found, assume the request is for
-     * a static resource like an image or HTML file.
+     * First try to route a user defined request, such as /user/dashboard/.
+     * If not found, assume the request is for a static resource like an
+     * image or HTML file.
      * @param {Request} request 
      * @param {Response} response 
      * @return {HttpServer}
