@@ -348,7 +348,6 @@ class Client extends EventEmitter {
      */
     handleMessageHeartbeat(message){
         message.setDone();
-        console.log("hi")
         return this.createMessage({route: "/hb"});
     }
 
