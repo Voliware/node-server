@@ -1,6 +1,5 @@
 const ObjectManager = require('./../util/objectManager');
 const Client = require('./client');
-const Message = require ('../message/message');
 
 /**
  * ClientManager.
@@ -25,30 +24,24 @@ class ClientManager extends ObjectManager {
         this.banned_list = [];
 
         this.logger.setName("ClientManager");
-
-		return this;
 	}
 
 	/**
 	 * Disconnect all Clients.
-	 * @return {ClientManager}
 	 */
     disconnectClients(){
 		for(let k in this.clients){
 			this.clients[k].disconnect();
 		}
-		return this;
     }
 
 	/**
 	 * Ban a client
 	 * @param {String} id - client id
-	 * @return {ClientManager}
 	 */
-	banClient(id){
+	ban(id){
 		this.delete(id);
 		this.banned_list.push(id);
-		return this;
 	}
 
     /**
@@ -63,14 +56,12 @@ class ClientManager extends ObjectManager {
 	/**
 	 * Broadcast a message to all clients
 	 * @param {Message} message
-	 * @return {ClientManager}
 	 */
 	broadcast(message){
 		for(let k in this.clients){
 			let client = this.clients[k];
-			client.writeMessage(message);
+			client.write(message);
 		}
-		return this;
 	}
 	
 	/**

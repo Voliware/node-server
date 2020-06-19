@@ -1,6 +1,4 @@
 const EventEmitter = require('events').EventEmitter;
-const Message = require('../message/message');
-const JsonMessage = require('../json/jsonMessage');
 const ServerListener = require('./serverListener');
 const ServerMonitor = require('./serverMonitor');
 const Client = require('./../client/client');
@@ -26,7 +24,6 @@ class Server extends EventEmitter {
      * @param {Number} [options.port=3000] - the port to listen on
      * @param {String} [options.data="buffer"] - for tcp/udp, what format to send/receive data in, ie buffer or string.
      *                                          For Websocket, this is not relevant.
-     * @param {Message} [options.message=JsonMessage] - the type of message to use
      * @param {Number} [options.max_clients=0] - max num of clients, or 0 for no max
      * @param {Number} [options.max_rooms=0] - max num of rooms, or 0 for no max
      * @param {Number} [options.heartbeat=0] - how often to send a heartbeat to UDP clients
@@ -39,7 +36,6 @@ class Server extends EventEmitter {
         host = "localhost",
         port = 3000,
         data_type = "buffer",
-        message_type = JsonMessage,
         client_timeout = 0,
         max_clients = 0,
         max_rooms = 0,
@@ -64,17 +60,10 @@ class Server extends EventEmitter {
         
         /**
          * What the incoming data looks like.
-         * buffer or string.
+         * "buffer" or "string".
          * @type {String}
          */
         this.data_type = data_type;
-        
-        /**
-         * The type of message to send 
-         * and receive between Clients
-         * @type {Message}
-         */
-        this.message_type = message_type;
         
         /**
          * Maximum amount of clients.
@@ -116,15 +105,6 @@ class Server extends EventEmitter {
          * @type {Function|Map}
          */
         this.router = router;
-        
-        // required for buffer based message construction (UDP/TCP)
-        this.message_options = {
-            // what to append at the end of each message to clients
-            // and also what is expected at the end of each message
-            eof: this.eof,
-            // utf8, etc
-            encoding: this.encoding
-        };
 
         /**
          * An object that monitors server stats.
@@ -160,10 +140,8 @@ class Server extends EventEmitter {
          */
         this.room_manager = new ObjectManager(this.max_rooms);
 
-		//this.client_manager.logger.setContext(this.log_handle);
-		//this.room_manager.logger.setContext(this.log_handle);
-        
-		return this;
+		this.client_manager.logger.options.context = this.log_handle;
+		this.room_manager.logger.options.context = this.log_handle;
     }
 
 	/**
@@ -205,11 +183,9 @@ class Server extends EventEmitter {
 	 * that extends Client, and some possible 
 	 * extra data about the initial connection.
 	 * @param {ServerListener} server_listener 
-	 * @return {Server}
 	 */
 	attachServerListenerHandlers(server_listener){
 		server_listener.on('connect', this.handleClientConnection.bind(this));
-		return this;
 	}
 
 	/**
@@ -217,7 +193,6 @@ class Server extends EventEmitter {
      * Emit a "connect" event with the client.
 	 * @param {Client} client 
 	 * @param {*} connectData 
-	 * @return {Server}
 	 */
 	handleClientConnection(client, connectData){
 		if(!(client instanceof Client)){
@@ -227,8 +202,6 @@ class Server extends EventEmitter {
 		this.attachClientHandlers(client);
         this.client_manager.add(client.id, client);
         this.emit('connect', client);
-		client.ping();
-		return this;
 	}
     
     /**
@@ -240,7 +213,6 @@ class Server extends EventEmitter {
      * - error
      * - maxError
      * @param {Client} client 
-     * @return {Server}
      */
     attachClientHandlers(client){
 		client.on('disconnnect', (data) => {
@@ -259,32 +231,28 @@ class Server extends EventEmitter {
 		client.on('error', (error) => {
             this.emit('error', client, error);
 		});
-        return this;
+    }
+
+    /**
+     * Write data to a client
+     * @param {Client} client 
+     * @param {*} data 
+     */
+    writeToClient(client, data){
+        client.write(data);
     }
 
     /////////////////////////////////////
-    // Messages
-    /////////////////////////////////////
-    
-    /**
-     * Create a message to send to a client.
-     * @param {Object} [options={}] 
-     * @return {Message}
-     */
-    createMessage(options = {}){
-        Object.extend(options, this.message_options, options);
-        return new this.message_type(options);
-    }
+    // Routing
+    /////////////////////////////////////    
 
     /**
      * Add a route to the router
      * @param {String} route 
      * @param {Function} handler - function to handle the route
-     * @return {Server}
      */
     addRoute(route, handler){
         this.router.set(route, handler);
-        return this;
     }
 
     /**
@@ -299,366 +267,160 @@ class Server extends EventEmitter {
     /**
      * Delete a route from the router.
      * @param {String} route 
-     * @return {Server}
      */
     deleteRoute(route){
         this.router.delete(route);
-        return this;
     }
 
     /**
      * Print out all routes
-     * @return {Server}
      */
     printRoutes(){
         for(let k in this.router){
             console.log(k);
         }
-        return this;
+    }
+
+    /////////////////////////////////////
+    // Room management
+    /////////////////////////////////////
+
+    createRoom(client, {
+        password = "",
+        hidden = false,
+        name = `${client.id}'s Room`,
+        max_objects = 0
+    })
+    {
+        let owner = client.id
+        let room = new Room({owner, password, hidden, name, max_objects});
+        this.addRoom(room);
+    }
+
+    addRoom(room){        
+		if(this.room_manager.get(room.name)){
+            return;
+        }
+        this.room_manager.add(room.name, room);
+    }
+
+    deleteRoom(name, client){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            this.room_manager.delete(room.name);
+        }
+    }
+
+    emptyRoom(name, client){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            room.empty();
+        }
+    }
+
+    getRooms(start, max){
+		return this.room_manager.serialize(start, max);
+    }
+
+    getRoom(name, client){
+        let room = this.room_manager.get(name);
+        if(room && (!room.isHidden() || room.isOwner(client.id))){
+            return room.serialize();
+        }
+        return null;
+    }
+
+    joinRoom(name, client, password = ""){
+        let room = this.room_manager.get(name);
+        if(room){
+            room.join(client, password);
+        }
+    }
+
+    leaveRoom(name, client){
+        let room = this.room_manager.get(name);
+        if(room){
+            room.delete(client.id);
+        }
+    }
+
+    banClient(name, client, client_to_ban){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            room.ban(client_to_ban);
+        }
+    }
+
+    kickClient(name, client, client_to_kick){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            room.delete(client_to_kick);
+        }
+    }
+
+    lockRoom(name, client){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            room.lock();
+        }
+    }
+
+    unlockRoom(name, client){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            room.unlock();
+        }
+    }
+
+    privatize(name, client){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            room.privatize();
+        }
+    }
+
+    deprivatize(name, client){
+        let room = this.room_manager.get(name);
+        if(room && room.isOwner(client.id)){
+            room.deprivatize();
+        }
     }
 
     /**
-     * Add the default routes to the router map.
-     * @return {Server}
+     * Route a message to the Server's router.
+     * @param {Number|String}
+     * @param {*} message 
+	 * @param {Client} client
      */
-	addDefaultRoutes(){
-		this.router.set("/client/whisper", this.handleMessageClientWhisper.bind(this));
-		this.router.set("/room/add", this.handleMessageRoomAdd.bind(this));
-		this.router.set("/room/delete", this.handleMessageRoomDelete.bind(this));
-		this.router.set("/room/empty", this.handleMessageRoomEmpty.bind(this));
-		this.router.set("/room/get", this.handleMessageRoomGet.bind(this));
-		this.router.set("/room/join", this.handleMessageRoomJoin.bind(this));
-		this.router.set("/room/leave", this.handleMessageRoomLeave.bind(this));
-		this.router.set("/room/client/ban", this.handleMessageRoomBanClient.bind(this));
-		this.router.set("/room/client/get", this.handleMessageRoomGetClients.bind(this));
-		this.router.set("/room/client/kick", this.handleMessageRoomKickClient.bind(this));
-		return this;
-	}
-
-	/**
-     * Handle a request to whisper directly to another client.
-     * Send the msg to the other client, if found.
-	 * Return a Message with the whispered msg or error.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.clientId
-	 * @param {String} message.data.msg
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageClientWhisper(message, client){
-        let msg = this.createMessage({route: "/client/whisper"});
-		let to_client = this.client_manager.get(message.data.clientId);
-		if(to_client){
-			msg.setData({
-				from: client.id,
-				msg: msg.data.msg
-			});
-            to_client.writeMessage(msg.serialize());
-        }
-        else {
-            msg.setError("Client not found");
-		}
-		return msg;
-	}
-
-	/**
-     * Handle a request to add a room.
-     * Immediately join the room if it is added.
-	 * Return a Message with ok or err.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.name
-	 * @param {String} [message.data.password]
-	 * @param {Boolean} [message.data.private]
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomAdd(message, client){
-        let msg = this.createMessage({route: "/room/add"});
-
-		// check if room exists
-		let room = this.room_manager.get(message.data.name);
-		if(room){
-			msg.setError("Room already exists");
-			return msg;
-		}
-
-        message.data.owner = client.id;
-		room = new Room(message.data);
-		if(room){
-            room.add(client.id, client);
-            this.room_manager.add(room.name, room);
-		}
-		else {
-			msg.setError("Failed to create room");
-		}
-		return msg;
-	}
-
-	/**
-     * Handle a request to delete a room.
-	 * Return a Message with ok or err.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.name
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomDelete(message, client){
-        let msg = this.createMessage({route: "/room/delete"});
-		let room = this.room_manager.get(message.data.name);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-        else if(!room.isOwner(client.id)){
-            msg.setError("You are not the father");
-        }
-		else {
-            this.room_manager.delete(message.data.name)
-        }
-		return msg;
-	}
-
-	/**
-     * Handle a request to empty a room.
-	 * Return a Message with ok or err.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.name
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomEmpty(message, client){
-        let msg = this.createMessage({route: "/room/empty"});
-		let room = this.room_manager.get(message.data.name);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-        else if(!room.isOwner(client.id)){
-            msg.setError("You are not the father");
-        }
-		else{
-			room.empty();
-		}
-		return msg;
-	}
-
-	/**
-     * Handle a request to get all rooms.
-	 * Return a Message with all rooms.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {Number} message.data.index
-	 * @param {Number} message.data.max
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomGetAll(message, client){
-		let rooms = this.room_manager.serialize(message.data.index, message.data.max);
-		return this.createMessage({
-			route: "/room/get/all",
-			data: {rooms: rooms}
-		});
-	}
-
-	/**
-     * Handle a request to get a room.
-	 * Return a Message with the room.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} [message.data.name] - room name if getting single room
-	 * @param {Number} [message.data.max=25] - max number of rooms if getting all rooms
-	 * @param {Number} [message.data.offset=0] - offset to start at if getting all rooms
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomGet(message, client){
-        let msg = this.createMessage({route: "/room/get"});
-
-        // get a room by name
-        if(message.data && message.data.name){
-            let room = this.room_manager.get(message.data.name);
-            if(room){
-                msg.setData(room.serialize());
-            }
-            else {
-                msg.setError("Invalid room");
-            }
-        }
-        // get all rooms
-        else {
-            let options = {
-                max: 25,
-                offset: 0
-            };
-            Object.assign(options, message.data);
-            msg.setData(this.room_manager.serialize(options.max, options.offset));
-        }
-
-        return msg;
-	}
-
-	/**
-     * Handle a request to join a room.
-	 * Return a Message with ok or err.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.room
-	 * @param {String} [message.data.password]
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomJoin(message, client){
-        let msg = this.createMessage({route: "/room/join"});
-		let room = this.room_manager.get(message.data.name);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-		else if(!room.join(client, message.data.password)){
-            msg.setError("Invalid password");
-        }
-        return msg;
-	}
-
-	/**
-     * Handle a request to leave a room.
-	 * Return a Message with ok or err.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.name
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomLeave(message, client){
-        let msg = this.createMessage({route: "/room/leave"});
-		let room = this.room_manager.get(message.data.name);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-		else {
-            room.delete(client.id)
-        }
-		return msg;
-	}
-
-	/**
-     * Handle a request to ban a client from a room.
-	 * Return a Message with ok or err.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.name
-	 * @param {String} message.data.clientId
-	 * @param {String} message.data.msg
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomBanClient(message, client){
-        let msg = this.createMessage({route: "/room/client/ban"});
-        let room = this.room_manager.get(message.data.name);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-        else if(!room.isOwner(client.id)){
-            msg.setError("You are not the father");
-        }
-		else{
-			room.banClient(message.data.clientId, message.data.msg);
-        }
-		return msg;
-	}
-
-	/**
-     * Handle a request to get a room's client list.
-	 * Return a Message with the client list.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.name
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomGetClients(message, client){
-        let msg = this.createMessage({route: "/room/client/get"});
-		let room = this.room_manager.get(message.data.name);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-        else {
-            msg.setData(room.client_manager.serialize());
-        }
-        return msg;
-	}
-
-	/**
-     * Handle a request to kick a client from a room.
-	 * Return a Message with ok or err.
-	 * @param {Message} message
-	 * @param {Object} message.data
-	 * @param {String} message.data.name
-	 * @param {String} message.data.clientId
-	 * @param {String} message.data.msg
-	 * @param {Client} client
-	 * @return {Message}
-	 */
-	handleMessageRoomKickClient(message, client){
-        let msg = this.createMessage({route: "/room/client/kick"});
-        let room = this.room_manager.get(message.data.name);
-		if(!room){
-            msg.setError("Invalid room");
-        }
-        else if(!room.isOwner(client.id)){
-            msg.setError("You are not the father");
-        }
-		else{
-			room.kickClient(data.clientId, data.msg);
-		}
-		return msg;
-	}
-
-	/**
-	 * Received command router.
-	 * @param {Message} message
-	 * @param {Client} client
-	 * @return {Server}
-	 */
-	routeMessage(message, client){
-        if(message.isDone()){
-            return this;
-        }
-		let route = this.router.get(message.route);
-		if(route){
-			let response_message = route(message, client);
-            if(response_message){
-                client.writeMessage(response_message);
+    routeMessage(route, message, client){
+		let handler = this.router.get(route);
+		if(handler){
+			let response = handler(message, client);
+            if(response){
+                this.write(response);
             }
 		}
-		return this;
     }
     
 	/**
      * Add default routes.
      * Attach server listener handlers.
 	 * Start the server by starting the listener. 
-	 * @return {Server}
 	 */
 	start(){
-        this.addDefaultRoutes();
 		this.attachServerListenerHandlers(this.server_listener);
         this.monitor.start();
 		this.server_listener.listen();
-		return this;
 	}
 
 	/**
 	 * Shut down the server listener
-	 * @return {Server}
 	 */
 	stop(){
+		this.server_listener.close();
 		this.client_manager.disconnectClients();
 		this.client_manager.empty();
-		this.server_listener.close();
         this.monitor.stop();
-		return this;
 	}
 }
 

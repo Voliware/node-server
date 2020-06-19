@@ -1,6 +1,5 @@
 const Client = require('../client/client');
 const WebSocket = require('ws');
-const JsonMessage = require('./../json/jsonMessage');
 
 /**
  * WebSocket Client.
@@ -16,9 +15,8 @@ class WebSocketClient extends Client {
 	 * @param {Object} [options={}]
 	 * @return {WebSocketClient}
 	 */
-	constructor(socket, {id = 0, message_type = JsonMessage}){
-        super(socket, {id, message_type});
-		return this;
+	constructor(socket, {id = 0}){
+        super(socket, {id});
     }
 
     /**
@@ -49,7 +47,6 @@ class WebSocketClient extends Client {
      * If debug logs are enabled, all events are logged.
      * If the socket hits max errors, the maxError event is emitted.
 	 * @param {WebSocket} socket
-	 * @return {WebSocketClient}
 	 */
     attachSocketHandlers(socket){
         // on open, emit open and ping the socket
@@ -62,14 +59,12 @@ class WebSocketClient extends Client {
             }, 1000);
         })
         
-        // on message, deserialize into message object
+        // on message, route and emit message
 		socket.on('message', (data) => {
             this.logger.debug('Received message:');
             this.logger.debug(data);
-            
-            let message = this.createMessage();
-            message.deserialize(data);
-            this.routeMessage(message);
+            this.routeMessage(data);
+            this.emit('message', data);
         });
 
         // on error, increase the max error count
@@ -86,16 +81,13 @@ class WebSocketClient extends Client {
             this.logger.debug(`Websocket closed with code: ${code}, reason: ${reason ? reason : "none"}`);
             this.emit('disconnect', {code, reason});
 		});
-		return this;
 	}
 
     /**
      * Disconnect the client.
-     * @return {WebSocketClient}
      */
     disconnect(){
 		this.socket.close(0, "");
-		return this;
     }
 
 	/**

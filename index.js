@@ -4,8 +4,6 @@ const HttpClient = require('./http/httpClient');
 const HttpRouter = require('find-my-way');
 const HttpServer = require('./http/httpServer');
 const HttpServerListener = require('./http/httpServerListener');
-const JsonMessage = require('./json/jsonMessage');
-const Message = require('./message/message');
 const MessageBuffer = require('./message/messageBuffer');
 const Room = require('./room/room');
 const Server = require('./server/server');
@@ -28,8 +26,6 @@ module.exports = {
     HttpRouter,
     HttpServer,
     HttpServerListener,
-    JsonMessage,
-    Message,
     MessageBuffer,
     Room,
     Server,

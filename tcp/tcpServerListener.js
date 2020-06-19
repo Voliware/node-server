@@ -15,33 +15,27 @@ class TcpServerListener extends ServerListener {
 	 */
 	constructor(options){
 		super(options);
-		return this;
 	}
 
 	/**
 	 * Create a TCP server and listen
 	 * for incoming connections.
-	 * @return {TcpServerListener}
 	 */
 	listen(){
 		this.createTcpServer();
 		this.logger.info(`Listening on ${this.host} port ${this.port}`);
-		return this;
 	}
 
 	/**
 	 * Close the server listener
-	 * @return {TcpServerListener}
 	 */
 	close(){
 		this.server.unref();
-		return this;
 	}
 
 	/**
 	 * Create a TCP server and start listening.
 	 * Create and emit a TcpClient via the connect event.
-	 * @return {TcpServerListener}
 	 */
 	createTcpServer(){
 		this.logger.info(`TCP server started on ${this.host} on port ${this.port}`);
@@ -50,7 +44,6 @@ class TcpServerListener extends ServerListener {
 			let client = this.createClient(socket);
 			this.emit('connect', client);
 		}).listen(this.port);
-		return this;
 	}
 
 	/**

@@ -44,14 +44,11 @@ class UdpSocket extends EventEmitter {
             context: `${this.address}:${this.port}`,
             level: "debug"
         });
-
-        return this;
     }
 
     /**
      * Write to the socket
      * @param {*} data 
-     * @return {UdpSocket}
      */
     write(data){
         this.logger.info(`Sending msg to ${this.address}:${this.port}`);
@@ -59,7 +56,6 @@ class UdpSocket extends EventEmitter {
             if (err) throw err;
             // self.logger.debug(data);
         });
-        return this;
     }
 
     /**
@@ -67,20 +63,16 @@ class UdpSocket extends EventEmitter {
      * Emit the data event.
      * @param {Buffer} data - the raw data, which is a buffer
      * @param {Object} rinfo - connection info, should be the same
-     * @return {UdpSocket}
      */
     receive(data, rinfo){
         this.emit('data', data);
-        return this;
     }
 
     /**
      * Close the socket
-     * @return {UdpSocket}
      */
     close(){
         this.socket.close();
-        return this;        
     }
 }
 

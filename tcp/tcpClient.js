@@ -1,6 +1,5 @@
 const Socket = require('net').Socket;
 const Client = require('./../client/client');
-const BufferJsonMessage = require('./../buffer/bufferJsonMessage');
 
 /**
  * TCP Client
@@ -14,9 +13,8 @@ class TcpClient extends Client {
 	 * @param {Object} [options={}]
 	 * @return {TcpClient}
 	 */
-	constructor(socket, {id = 0, message_type = BufferJsonMessage}) {
-        super(socket, {id, message_type});
-		return this;
+	constructor(socket, {id = 0}) {
+        super(socket, {id});
 	}
 
 	/**
@@ -44,7 +42,6 @@ class TcpClient extends Client {
 	/**
 	 * Attach handlers to the socket.
 	 * @param {Socket} socket 
-	 * @return {TcpClient}
 	 */ 
 	attachSocketHandlers(socket) {
 		socket.on('data', (data) => {
@@ -70,17 +67,14 @@ class TcpClient extends Client {
 			this.logger.info("Socket has closed");
 			this.emit('disconnect');
 		});
-		return this;
 	}
 
     /**
      * Disconnect the client.
-     * @return {TcpClient}
      */
     disconnect(){
 		this.socket.end();
 		// may need to call destroy?
-		return this;
     }
 
 	/**

@@ -1,4 +1,4 @@
-const dgram = require('dgram');
+const Dgram = require('dgram');
 const ServerListener = require ('../server/serverListener');
 const UdpClient = require('./udpClient');
 const UdpSocket = require('./udpSocket');
@@ -16,35 +16,29 @@ class UdpServerListener extends ServerListener {
 	 */
 	constructor(options){
 		super(options);
-		return this;
 	}
 
 	/**
 	 * Create a UDP server and listen
 	 * for incoming connections.
-	 * @return {UdpServerListener}
 	 */
 	listen(){
 		this.createUdpServer();
-		return this;
 	}
 
 	/**
 	 * Close the server listener.
 	 * Does nothing for UDP.
-	 * @return {UdpServerListener}
 	 */
 	close(){
-		return this;
 	}
 
 	/**
 	 * Create a UDP server and start listening.
 	 * Create and emit a UdpClient via the connect event.
-	 * @return {UdpServerListener}
 	 */
 	createUdpServer(){
-        this.server = dgram.createSocket('udp4');
+        this.server = Dgram.createSocket('udp4');
 		this.server.on('listening', () => {
 			let addr = this.server.address();
 			this.logger.info(`Listening on ${addr.address} port ${addr.port}`);

@@ -43,43 +43,34 @@ class MessageBuffer {
         else if(this.type === "buffer"){
             this.append = this.appendBuffer;
         }
-        
-        return this;
     }
 
     /**
      * Append data to the buffer.
      * This function is actually set during construction.
      * @param {Buffer|String} data
-     * @return {MessageBuffer}
      */
     append(data){
-        return this;
     }
     
     /**
      * Empty the buffer
-     * @return {MessageBuffer}
      */
 	empty(){
 		this.buffer = null;
-		return this;
     }
     
     /**
      * Append data to the buffer.
      * @param {String} buffer
-     * @return {MessageBuffer}
      */
     appendString(buffer){
         this.buffer += buffer;
-		return this;
     }
 
     /**
      * Append data to the buffer.
      * @param {Buffer} buffer
-     * @return {MessageBuffer}
      */
 	appendBuffer(buffer){
         buffer = Buffer.from(buffer, this.encoding);
@@ -89,7 +80,6 @@ class MessageBuffer {
         else {
             this.buffer = Buffer.concat([this.buffer, buffer]);
         }
-		return this;
     }
 
 	/**

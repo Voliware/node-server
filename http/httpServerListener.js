@@ -1,6 +1,6 @@
-const fs = require('fs');
-const http = require('http');
-const https = require('https');
+const Fs = require('fs');
+const Http = require('http');
+const Https = require('https');
 const ServerListener = require('../server/serverListener');
 const HttpClient = require('./httpClient');
 
@@ -61,45 +61,38 @@ class HttpServerListener extends ServerListener {
 		// set certs
         this.setSslCertificateFromFile(this.certificate_path);
         this.setSslPrivateKeyFromFile(this.private_key_path);
-        
-		return this;
 	}
 
 	/**
 	 * Set SSL cerficiate a provided path or from
 	 * the path setting that was passed in the constructor.
 	 * @param {String} path
-	 * @return {HttpServerListener}
 	 */
 	setSslCertificateFromFile(path){
-        if (fs.existsSync(path)) {
-            this.certificate = fs.readFileSync(path, 'utf8');
+        if (Fs.existsSync(path)) {
+            this.certificate = Fs.readFileSync(path, 'utf8');
         }
         else {
             this.logger.warning("SSL cert file does not exist");
         }
-		return this;
 	}
 
 	/**
 	 * Set SSL cerficiate a provided path or from
 	 * the path setting that was passed in the constructor.
 	 * @param {String} path
-	 * @return {HttpServerListener}
 	 */
 	setSslPrivateKeyFromFile(path){
-        if (fs.existsSync(path)) {
-            this.private_key = fs.readFileSync(path, 'utf8');
+        if (Fs.existsSync(path)) {
+            this.private_key = Fs.readFileSync(path, 'utf8');
         }
         else {
             this.logger.warning("SSL key file does not exist");
         }
-		return this;
 	}
 
 	/**
 	 * Attach handlers to the HTTP server
-	 * @return {HttpServerListener}
 	 */
 	attachHttpServerHandlers(){
 		this.server.on('error', (error) => {
@@ -121,13 +114,11 @@ class HttpServerListener extends ServerListener {
             this.logger.debug(`Requested method: ${request.method} of ${request.url}`);
             this.emit('request', request, response);
         });
-		return this;
 	}
 
 	/**
 	 * Create an HTTP or HTTPS server and listen
 	 * for incoming connections.
-	 * @return {HttpServerListener}
 	 */
 	listen(){
 		if(this.https === true){
@@ -138,16 +129,13 @@ class HttpServerListener extends ServerListener {
 		}
 		this.attachHttpServerHandlers();
 		this.logger.info(`Listening on ${this.host} port ${this.port}`);
-		return this;
 	}
 
 	/**
 	 * Close the server listener
-	 * @return {HttpServerListener}
 	 */
     close(){
         this.server.close();
-		return this;
     }
 
 	/**
@@ -156,7 +144,7 @@ class HttpServerListener extends ServerListener {
 	 * @return {Server}
 	 */
 	createHttpServer(listener){
-		let server = http.createServer(listener);
+		let server = Http.createServer(listener);
 		server.listen({
 			host: this.host,
 			port: this.port
@@ -172,7 +160,7 @@ class HttpServerListener extends ServerListener {
 	 * @return {Server}
 	 */
 	createHttpsServer(listener){
-		let server = https.createServer({key: this.private_key, cert: this.certificate}, listener);
+		let server = Https.createServer({key: this.private_key, cert: this.certificate}, listener);
 		server.listen({
 			host: this.host,
 			port: this.port

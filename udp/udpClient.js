@@ -1,6 +1,5 @@
 const Socket = require('net').Socket;
 const Client = require('../client/client');
-const BufferJsonMessage = require('./../buffer/bufferJsonMessage');
 
 /**
  * UDP Client
@@ -14,9 +13,8 @@ class UdpClient extends Client {
 	 * @param {Object} [options={}]
 	 * @return {UdpClient}
 	 */
-    constructor(socket, {id = 0, message_type = BufferJsonMessage}) {
-        super(socket, {id, message_type});
-		return this;
+    constructor(socket, {id = 0}) {
+        super(socket, {id});
 	}
 
     /**
@@ -44,7 +42,6 @@ class UdpClient extends Client {
 	/**
 	 * Attach handlers to the socket.
 	 * @param {Socket} socket 
-	 * @return {UdpClient}
 	 */
 	attachSocketHandlers(socket){		
 		socket.on('data', (data) => {
@@ -68,7 +65,6 @@ class UdpClient extends Client {
 			this.logger.info("Socket has closed");
 			this.emit('disconnect');
 		});
-		return this;
 	}
 
 	/**
@@ -83,23 +79,19 @@ class UdpClient extends Client {
 	/**
 	 * Disconnect the client.
 	 * Does nothing for UDP.
-	 * @return {UdpClient}
 	 */
 	disconnect(){
-		return this;
 	}
 
     /**
      * Virtually receive data from the socket.
      * @param {*} data 
      * @param {Object} rinfo - connection info, should be the same
-     * @return {UdpSocket}
      */
 	socketReceive(data, rinfo){
 		if(this.socket){
 			this.socket.receive(data, rinfo);
 		}
-		return this;
 	}
 
 	/**

@@ -59,61 +59,49 @@ class ObjectManager extends EventEmitter {
          */
         this.logger = new Logger("ObjectManager", {level: "debug"});
 
-		return this;
 	}
     
     /**
      * Update the count_peak stat
-     * @return {ObjectManager}
      */
     updatePeakCount(){
         if(this.count > this.count_peak){
             this.count_peak = this.count;
         }
-        return this;
     }
 
     /**
      * Increment the count_total state
-     * @return {ObjectManager}
      */
     incrementTotal(){
         this.count_total++;
-        return this;
     }
     
     /**
      * Callback when objects are added.
      * @param {Object} object 
-	 * @return {ObjectManager}
      */
     onAddObject(object){
-        return this;
     }
     
     /**
      * Callback when objects are deleted.
      * @param {Object} object 
-	 * @return {ObjectManager}
      */
     onDeleteObject(object){
-        return this;
     }
     
     /**
      * Callback when objects are updated.
      * @param {Object} object 
-	 * @return {ObjectManager}
      */
     onUpdateObject(object){
-        return this;
     }
 
     /**
 	 * Add an object if max objects is not reached.
 	 * @param {Number|String} id
 	 * @param {Object} obj
-	 * @return {ObjectManager}
 	 */
 	addOne(id, obj){
 		if(!this.max_objects || this.count !== this.max_objects){
@@ -127,13 +115,11 @@ class ObjectManager extends EventEmitter {
         this.count_total++;
         this.updatePeakCount();
         this.onAddObject(obj);
-		return this;
     }
     
 	/**
 	 * Add an array or collection of objects
 	 * @param {Object|Object[]} objects
-	 * @return {ObjectManager}
 	 */
     addMany(objects){
         if(Array.isArray(objects)){
@@ -151,7 +137,6 @@ class ObjectManager extends EventEmitter {
                 }
             }
         }
-		return this;
     }
 
 	/**
@@ -161,7 +146,6 @@ class ObjectManager extends EventEmitter {
 	 * @param {Number|String|Object|Object[]} id - if passing single object, it's id
      *                                             otherwise, array or object of objects
 	 * @param {object[]|object} [objects] - if passing a single object, the object
-	 * @return {ObjectManager}
      * @example 
      * add(554, {});
      * add([{id:1},..]);
@@ -174,31 +158,26 @@ class ObjectManager extends EventEmitter {
         else {
             this.addMany(...arguments);
         }
-		return this;
 	}
 
 	/**
 	 * Delete an object
 	 * @param {Number|String} id
-	 * @return {ObjectManager}
 	 */
 	delete(id){
 		delete this.objects[id];
         this.logger.info(`Deleted object ${id}`);
         this.count--;
         this.onDeleteObject(id);
-		return this;
     }
 
     /**
      * Delete all objects
-	 * @return {ObjectManager}
 	 */
     deleteAll(){
         for(let k in this.objects){
             this.delete(k);
         }
-        return this;
     }
 
 	/**
@@ -234,24 +213,20 @@ class ObjectManager extends EventEmitter {
 	 * Update an object by replacing it.
 	 * @param {Number|String} id
 	 * @param {Object} obj
-	 * @return {ObjectManager}
 	 */
 	update(id, obj){
 		this.objects[id] = obj;
 		this.logger.debug(`Update object ${id}`);
         this.onUpdateObject(obj);
-		return this;
 	}
     
     /**
      * Remove all objects.
      * Does not call delete on them.
-     * @return {ObjectManager}
      */
     empty(){
         this.objects = [];
         this.count = 0;
-        return this;
     }
     
     /**
@@ -274,9 +249,9 @@ class ObjectManager extends EventEmitter {
 
 	/**
 	 * Serialize all objects that have a serialize method.
-	 * @return {object[]}
+	 * @return {Object[]}
 	 */
-	serialize(max = 0, offset = 0){
+    serializeObjects(max = 0, offset = 0){
         let serialized_objects = [];
         for(let k in this.objects){
             // skip until offset
@@ -299,9 +274,17 @@ class ObjectManager extends EventEmitter {
                 }
             }
         }
+        return serialized_objects;
+    }
+
+	/**
+	 * Serialize the object mananger.
+	 * @return {Object}
+	 */
+	serialize(max = 0, offset = 0){
 		return {
             count: this.count,
-            objects: serialized_objects,
+            objects: this.serializeObjects(max, offset),
             max: this.max_objects
         };
 	}

@@ -67,21 +67,17 @@ class HttpServer extends Server {
 
         // todo: this needs to be done in a more intuitive way
         this.server_listener.setClientManager(this.client_manager);
-
-        return this;
     }
 
     /**
      * Attach handlers to the server listener
      * @param {ServerListener} server_listener
-     * @return {HttpServer} 
      */
     attachServerListenerHandlers(server_listener){
         super.attachServerListenerHandlers(server_listener);
         server_listener.on('request', (request, response) => {
             this.routeRequest(request, response);
         });
-        return this;
     }
 
     /**
@@ -147,7 +143,7 @@ class HttpServer extends Server {
     /**
      * Get the stats for a file
      * @param {String} filepath
-     * @returns {Promise<Fs.Stats>} 
+     * @return {Promise<Fs.Stats>} 
      */
     getFileStats(filepath){
         return new Promise((resolve, reject) => {
@@ -223,7 +219,6 @@ class HttpServer extends Server {
      * recursively add each file to the static map.
      * @todo Add file size, stats, mime, to each entry
      * @param {String} path 
-     * @return {HttpServer}
      */
     findPublicFiles(path){
         let directories = [];
@@ -253,8 +248,6 @@ class HttpServer extends Server {
                 path = directories.pop();
             }
         }
-
-        return this;
     }
 
     /**
@@ -263,11 +256,9 @@ class HttpServer extends Server {
      * and the value is the full filepath.
      * @param {String} url - url request, eg /js/app.js
      * @param {String} filepath - file path, eg C:/webserver/js/app.js
-     * @return {HttpServer}
      */
     addPublicFile(url, filepath){
         this.public_files.set(url, filepath);
-        return this;
     }
 
     /**
@@ -301,7 +292,6 @@ class HttpServer extends Server {
      * Route a request for a static file.
      * @param {Request} request 
      * @param {Response} response 
-     * @return {HttpServer}
      */
     async routePublicFile(request, response){
         let filepath = await this.getPublicFile(request.url);
@@ -309,10 +299,10 @@ class HttpServer extends Server {
             filepath = await this.findPublicFile(request.url);
         }
         if(filepath){
-            return this.sendFile(filepath, response);
+            this.sendFile(filepath, response);
         }
         else {
-            return this.sendStatusCode(response, 404);
+            this.sendStatusCode(response, 404);
         }
     }
     
@@ -321,7 +311,6 @@ class HttpServer extends Server {
      * @param {String} method 
      * @param {String} route 
      * @param {Function} handler - function to handle the route
-     * @return {HttpServer}
      */
     addRoute(method, route, handler){   
         method = method.toUpperCase();
@@ -339,7 +328,6 @@ class HttpServer extends Server {
                     handler(request, response, {});
                 });
         });
-        return this;
     }
 
     /**
@@ -357,30 +345,22 @@ class HttpServer extends Server {
      * Delete a route from the router.
      * @param {String} method 
      * @param {String} route 
-     * @return {HttpServer}
      */
     deleteRoute(method, route){
         this.router.off(method, route);
-        return this;
     }
 
     /**
      * Print out all routes
-     * @return {HttpServer}
      */
     printRoutes(){
         this.router.prettyPrint();
-        return this;
     }
     
     /**
      * Add the default routes to the router map.
-     * Override as to not add the default Server 
-     * routes which are not compatible.
-     * @return {HttpServer}
      */
 	addDefaultRoutes(){
-		return this;
     }
 
     /**
@@ -450,11 +430,9 @@ class HttpServer extends Server {
      * image or HTML file.
      * @param {Request} request 
      * @param {Response} response 
-     * @return {HttpServer}
      */
     routeRequest(request, response){
         this.router.lookup(request, response);
-        return this;
     }
 }
 

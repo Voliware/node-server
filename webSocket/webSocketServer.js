@@ -25,7 +25,6 @@ class WebSocketServer extends Server {
             host: this.host,
             port: this.port
         });
-        return this;
     }
 }
 

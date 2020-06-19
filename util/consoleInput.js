@@ -22,7 +22,6 @@ class ConsoleInput extends EventEmitter {
             // console.log("-> " + line);
             self.emit('line', line);
         });
-        return this;
     }
 }
 

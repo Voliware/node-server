@@ -1,5 +1,4 @@
 const EventEmitter = require('events').EventEmitter;
-const Message = require('./../message/message');
 const MessageBuffer = require('./../message/messageBuffer');
 const Logger = require('@voliware/logger');
 
@@ -10,16 +9,15 @@ const Logger = require('@voliware/logger');
  * It must implement 
  * - attachSocketHandlers
  * - write
- * - ping
- * - pong
  * It must emit
  * - message
  * - disconnect
  * - reconnect
  * - error
  * - maxError
- * - ping
- * - pong
+ * To use ping(), you must implement createPingMessage()
+ * To use pong(), you must implement createPongMessage()
+ * To use the heartbeat, you must implement createHeartbeatMessage()
  * If the client receives non-textual data, such as a 
  * TCP or UDP client receiving Buffer data, an rxBuffer is
  * available to store and parse the data into Message objects.
@@ -32,7 +30,6 @@ class Client extends EventEmitter {
      * @param {Object} socket - the socket itself (TCP, UDP, HTTP/S, WS/S)
      * @param {Object} [options={}]
      * @param {Number} [options.id]
-	 * @param {Message} [options.message_type=Message] - constructor to use for creating Messages
 	 * @param {String} [options.data="buffer"] - the type of data the client receives
      * @param {String} [options.encoding="utf8"] - rx/tx buffer encoding
 	 * @param {String} [options.eof="\r"] - rx/tx buffer end of datagram character
@@ -44,7 +41,6 @@ class Client extends EventEmitter {
 	 */
 	constructor(socket, {
         id = 0,
-        message_type = Message,
         data_type = "buffer",
         encoding = "utf8",
         eof = "\r",
@@ -108,21 +104,6 @@ class Client extends EventEmitter {
             encoding: this.encoding, 
             eof: this.eof
         });
-
-        /**
-         * Message constructor
-         * @type {Message|Function}
-         */
-        this.message_type = message_type;
-
-        /**
-         * Message options
-         * @type {Object}
-         */
-        this.message_options = {
-            encoding: this.encoding,
-            eof: this.eof
-        };
         
         /**
          * Message router
@@ -183,14 +164,11 @@ class Client extends EventEmitter {
         }
 
         // init
-        this.addDefaultRoutes();
         this.attachSocketHandlers(this.socket);
 
         if(this.heartbeat.frequency){
-           // this.startHeartbeat();
+            this.startHeartbeat();
         }
-
-		return this;
     }
 
     /**
@@ -214,59 +192,28 @@ class Client extends EventEmitter {
     /**
      * Set the client's id
      * @param {Number|String} id
-     * @return {Client} 
      */
     setId(id){
         this.id = id;
-        return this;
     }
 
     /**
      * Set the client's name
      * @param {String} name 
-     * @return {Client} 
      */
     setName(name){
         this.name = name;
-        return this;
-    }
-    
-    /**
-     * Record the latency as between 
-     * now and when the last ping was sent
-     * @return {Client}
-     */
-    recordLatency(){
-        if(this.last_ping_sent){
-            this.latency = Date.now() - this.last_ping_sent;
-            this.logger.info(`Ping is ${this.latency} ms`);
-        }
-        this.last_ping_sent = 0;
-        return this;
-    }
-
-    /**
-     * Update when the last ping was sent
-     * to the current timestamp.
-     * @return {Client}
-     */
-    updateLastPingSent(){
-        this.last_ping_sent = Date.now();
-        return this;
     }
 
     /**
      * Attach handlers to the socket.
-     * This handler should be able to emit
+     * These handlers should be able emit
      * - reconnect
      * - disconnect
      * - message
      * - error
      * - maxError
-     * - ping
-     * - pong
      * @param {*} socket
-     * @return {Client}
      */
     attachSocketHandlers(socket){
         throw new Error("attachSocketHandlers must be implemented");
@@ -274,7 +221,6 @@ class Client extends EventEmitter {
 
     /**
      * Disconnect the client.
-     * @return {Client}
      */
     disconnect(){
         throw new Error("disconnect must be implemented");
@@ -283,18 +229,6 @@ class Client extends EventEmitter {
     /////////////////////////////////////////////////////////
     // Messaging and routing
     ////////////////////////////////////////////////////////
-    
-	/**
-	 * Create a message.
-	 * This uses the Message constructor
-	 * passed in via the Client constructor options.
-     * @param {Object} [options=null] - message options
-	 * @return {Message}
-	 */
-	createMessage(options = {}){
-        Object.extend(this.message_options, options);
-		return new this.message_type(options);
-	}
 
 	/**
 	 * Write data to the socket
@@ -306,98 +240,10 @@ class Client extends EventEmitter {
     }
 
     /**
-     * Serialize a Message and write to the socket.
-     * @param {Message} msg 
-	 * @return {*}
-     */
-    writeMessage(msg){
-        return this.write(msg.serialize());
-    }
-
-    /**
-     * Handle a ping message by returning a 
-     * pong message as a response to the client's
-     * intent of determining the latency or connection.
-     * @param {Message} message 
-     * @return {Message}
-     */
-    handleMessagePing(message){
-        message.setDone();
-        return this.createMessage({route: "/pong"});
-    }
-
-    /**
-     * Handle a pong message by simply
-     * recording the latency. The pong message
-     * will always come from a client that has
-     * just received a ping message.
-     * @param {Message} message 
-     * @return {Null}
-     */
-    handleMessagePong(message){
-        this.recordLatency();
-        message.setDone();
-        return null;
-    }
-
-    /**
-     * Handle a heartbeat message by returning
-     * a heartbeat message.
-     * @param {Message} message 
-     * @return {Null}
-     */
-    handleMessageHeartbeat(message){
-        message.setDone();
-        return this.createMessage({route: "/hb"});
-    }
-
-    /**
-     * Add the default routes to the router map.
-     * @return {Client}
-     */
-	addDefaultRoutes(){
-		this.router.set("/ping", this.handleMessagePing.bind(this));
-        this.router.set("/pong", this.handleMessagePong.bind(this));
-        this.router.set("/hb", this.handleMessageHeartbeat.bind(this));
-		return this;
-	}
-
-    /**
-     * Route a message to the Client's router.
-     * @param {Message} message 
-     * @return {Client}
+     * Route a message 
+     * @param {*} message 
      */
     routeMessage(message){
-		let responseMessage = null;
-		let route = this.router.get(message.route);
-		if(route){
-			responseMessage = route(message);
-		}
-		if(responseMessage){
-            // console.log(responseMessage.route)
-			this.writeMessage(responseMessage);
-        }
-        this.emit("message", message);
-        return this;
-    }
-
-    /**
-     * Ping the web socket
-	 * @return {*|Number}
-     */
-    ping(){
-        this.updateLastPingSent();
-        let message = this.createMessage({route: "/ping"})
-        return this.writeMessage(message);
-    }
-
-    /**
-     * Pong the web socket
-	 * @return {*|Number}
-     */
-    pong(){
-        let message = this.createMessage({route: "/pong"})
-        return this.writeMessage(message);
     }
 
 	/**
@@ -412,35 +258,99 @@ class Client extends EventEmitter {
     }
 
     /////////////////////////////////////////////////////////
+    // Ping, Pong, Latency
+    /////////////////////////////////////////////////////////
+
+    /**
+     * Create a ping message.
+     * Must be implemented.
+     * @return {*}
+     */
+    createPingMessage(){
+        throw new Error("createPingMessage must be defined");
+    }
+
+    /**
+     * Create a ping message and write to the socket.
+     */
+    ping(){
+        let msg = this.createPingMessage();
+        this.write(msg);
+    }
+
+    /**
+     * Create a pong message.
+     * Must be implemented.
+     * @return {*}
+     */
+    createPongMessage(){
+        throw new Error("createPongMessage must be defined");
+    }
+
+    /**
+     * Create a pong message and write to the socket.
+     */
+    pong(){
+        let msg = this.createPongMessage();
+        this.write(msg);
+    }
+    
+    /**
+     * Record the latency as between 
+     * now and when the last ping was sent
+     */
+    recordLatency(){
+        if(this.last_ping_sent){
+            this.latency = Date.now() - this.last_ping_sent;
+            this.logger.debug(`Ping is ${this.latency} ms`);
+        }
+        this.last_ping_sent = 0;
+    }
+
+    /**
+     * Update when the last ping was sent
+     * to the current timestamp.
+     */
+    updateLastPingSent(){
+        this.last_ping_sent = Date.now();
+    }
+
+    /////////////////////////////////////////////////////////
     // Heartbeat
     /////////////////////////////////////////////////////////
 
     /**
+     * Create a heartbeat message.
+     * Must be implemented.
+     * @return {*}
+     */
+    createHeartbeatMessage(){
+        throw new Error("createHeartbeatMessage must be defined");
+    }
+
+    /**
      * Create a heartbeat message and write to the socket.
-     * @return {Client}
      */
     heartbeatRequest(){
-        let msg = this.createMessage({route: "/hb"});
-        this.writeMessage(msg);
-        return this;
+        let msg = this.createHeartbeatMessage();
+        this.write(msg);
     }
 
     /**
      * Start the heartbeat interval.
-     * @return {Client}
      */
     startHeartbeat(){
-        this.heartbeat.interval = setInterval(heartbeat.request.bind(this), heartbeat.frequency);
-        return this;
+        this.heartbeat.interval = setInterval(
+            this.heartbeat.request.bind(this), 
+            this.heartbeat.frequency
+        );
     }
 
     /**
      * Stop the heartbeat interval.
-     * @return {Client}
      */
     stopHeartbeat(){
         clearInterval(this.heartbeat.interval);
-        return this;
     }
     
     /////////////////////////////////////////////////////////
@@ -453,37 +363,19 @@ class Client extends EventEmitter {
     /**
      * Process received data buffer.
      * Append the data to the rx buffer.
-     * Process the rx buffer into Message objects.
+     * Process the rx buffer into messages.
      * For each message, emit a "message" event.
      * @param {Buffer} data 
-     * @return {Client}
      */
     processRxData(data){
         this.rx_buffer.append(data);
-        let datagrams = this.rx_buffer.split();
-        let messages = this.datagramsToMessages(datagrams);
+        let messages = this.rx_buffer.split();
         
         for(let i = 0; i < messages.length; i++){
+            this.logger.debug(messages[i]);
             this.routeMessage(messages[i]);
             this.emit('message', messages[i]);
         }
-		return this;
-    }
-
-	/**
-	 * Convert an array of Buffers or string
-     * datagrams to an array of Message objects.
-     * @param {Buffer[]|string[]} datagrams
-     * @return {Message[]} - array of Messages
-	 */
-	datagramsToMessages(datagrams){
-        let messages = [];
-        for(let i = 0; i < datagrams.length; i++){
-            let message = this.createMessage();
-            message.deserialize(datagrams[i]);
-            messages.push(message);
-        }
-		return messages;
     }
 }
 

@@ -19,29 +19,24 @@ class WebSocketServerListener extends HttpServerListener {
 	 */
 	constructor(options = {}){
 		super(options);
-		return this;
 	}
 
 	/**
 	 * Start an HTTP/S server and a WebSocket server.
 	 * Begin listening on the WebSocket server.
-	 * @return {WebSocketServerListener}
 	 */
 	listen(){
         super.listen();
         this.webSocketServer = this.createWebSocketServer(this.server);
         this.attachWebSocketServerHandlers();
-		return this;
 	}
 
 	/**
 	 * Close the server listener.
-	 * @return {WebSocketServerListener}
 	 */
 	close(){
         super.close();
 		this.webSocketServer.close();
-		return this;
 	}
 
 	/**
@@ -54,7 +49,6 @@ class WebSocketServerListener extends HttpServerListener {
     }
     
     attachHttpServerHandlers(){
-        return this;
     }
 
 	/**
@@ -68,7 +62,6 @@ class WebSocketServerListener extends HttpServerListener {
 			let client = this.createClient(socket);
 			this.emit('connect', client, req);
 		});
-		return this;
 	}
 
 	/**

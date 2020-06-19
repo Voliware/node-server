@@ -70,14 +70,11 @@ class ServerListener extends EventEmitter {
             context: `${this.host}:${this.port}`,
             level: "debug"
         });
-
-        return this;
     }
 
     /**
      * Begin listening.
      * @param {Object} [options]
-	 * @return {ServerListener}
      */
     listen(options){
         throw new Error("listen must be implemented");
@@ -85,7 +82,6 @@ class ServerListener extends EventEmitter {
 
 	/**
 	 * Close the server listener
-	 * @return {ServerListener}
 	 */
     close(){
         throw new Error("close must be implemented");
@@ -106,11 +102,9 @@ class ServerListener extends EventEmitter {
 	/**
 	 * Set the ClientManager.
 	 * @param {ClientManager} client_manager 
-	 * @return {ServerListener}
 	 */
 	setClientManager(client_manager){
 		this.client_manager = client_manager;
-		return this;
 	}
 }
 

@@ -13,13 +13,8 @@ class AppExample {
     constructor(){
         this.webSocketServer = new NodeServer.WebSocketServer({port: 2222});
         this.httpServer = new NodeServer.HttpServer({port: 80});
-        this.tcpServer = new NodeServer.TcpServer({
-            port: 666,
-            message: {
-                
-            }
-        });
-        this.udpServer = new NodeServer.UdpServer({port: 9000});
+        this.tcpServer = new NodeServer.TcpServer({port: 666});
+        this.udpServer = new NodeServer.UdpServer({port: 667});
 
         // http routes
         this.httpServer.addRoute('GET', '/status', (req, res) => {
