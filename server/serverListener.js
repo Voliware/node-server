@@ -73,6 +73,13 @@ class ServerListener extends EventEmitter {
     }
 
     /**
+     * Get the low level Node server object
+     */
+    getServer(){
+        return this.server;
+    }
+
+    /**
      * Begin listening.
      * @param {Object} [options]
      */

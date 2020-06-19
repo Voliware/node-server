@@ -1,6 +1,7 @@
 const HttpServerListener = require('../http/httpServerListener');
 const WebSocketServer = require('ws').Server;
 const WebSocketClient = require('./webSocketClient');
+const Server = require('../server/server');
 
 /**
  * WebSocket based ServerListener.
@@ -14,11 +15,34 @@ class WebSocketServerListener extends HttpServerListener {
 
 	/**
 	 * Constructor
-	 * @param {Object} [options]
+     * @param {Object} [options={}]
+     * @param {String} [options.host="localhost"]
+     * @param {Number} [options.port=2222]
+     * @param {Server} [options.http_server=null]
 	 * @return {WebSocketServerListener}
 	 */
-	constructor(options = {}){
-		super(options);
+	constructor({
+        host = "localhost",
+        port = 2222,
+        http_server = null
+    })
+    {
+        if(http_server){
+            host = http_server.host;
+            port = http_server.port;
+        }
+
+        super({host, port});    
+
+        if(http_server){
+            this.server = http_server.server_listener.getServer();
+        }
+        
+        /**
+         * The websocket server
+         * @type {WebSocketServer}
+         */
+        this.web_socket_server = null;
 	}
 
 	/**
@@ -26,8 +50,16 @@ class WebSocketServerListener extends HttpServerListener {
 	 * Begin listening on the WebSocket server.
 	 */
 	listen(){
-        super.listen();
-        this.webSocketServer = this.createWebSocketServer(this.server);
+        // Already have an HTTP server set
+        if(this.server){
+            this.logger.info(`Binding to HTTP server started on ${this.server.host} on port ${this.server.port}`);
+            this.web_socket_server = this.createWebSocketServer(this.server);
+        }
+        // Create an HTTP server
+        else {
+            super.listen();
+            this.web_socket_server = this.createWebSocketServer(this.server);
+        }
         this.attachWebSocketServerHandlers();
 	}
 
@@ -35,8 +67,13 @@ class WebSocketServerListener extends HttpServerListener {
 	 * Close the server listener.
 	 */
 	close(){
-        super.close();
-		this.webSocketServer.close();
+        if(this.http_server){
+            this.http_server.close;
+        }
+        else {
+            super.close();
+        }
+		this.web_socket_server.close();
 	}
 
 	/**
@@ -48,6 +85,9 @@ class WebSocketServerListener extends HttpServerListener {
 		return new WebSocketServer({server});
     }
     
+    /**
+     * Override to do nothing
+     */
     attachHttpServerHandlers(){
     }
 
@@ -57,7 +97,7 @@ class WebSocketServerListener extends HttpServerListener {
 	 * @return {WebSocketServerListener}
 	 */
 	attachWebSocketServerHandlers(){
-		this.webSocketServer.on('connection', (socket, req) => {
+		this.web_socket_server.on('connection', (socket, req) => {
 			this.logger.info('WebSocket connected');
 			let client = this.createClient(socket);
 			this.emit('connect', client, req);

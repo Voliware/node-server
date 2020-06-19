@@ -11,24 +11,26 @@ class AppExample {
      * @return {AppExample}
      */
     constructor(){
-        this.webSocketServer = new NodeServer.WebSocketServer({port: 2222});
-        this.httpServer = new NodeServer.HttpServer({port: 80});
-        this.tcpServer = new NodeServer.TcpServer({port: 666});
-        this.udpServer = new NodeServer.UdpServer({port: 667});
+        this.http_server = new NodeServer.HttpServer({port: 80});
+        this.websocket_server_b = new NodeServer.WebSocketServer({port: 2222});
+        this.tcp_server = new NodeServer.TcpServer({port: 666});
+        this.udp_server = new NodeServer.UdpServer({port: 667});
 
         // http routes
-        this.httpServer.addRoute('GET', '/status', (req, res) => {
-            this.httpServer.sendJson(res, {status:"Online"});
+        this.http_server.addRoute('GET', '/status', (req, res) => {
+            this.http_server.sendJson(res, {status:"Online"});
         });
-        this.httpServer.addRoute('GET', '/version', (req, res) => {
-            this.httpServer.sendJson(res, {version});
+        this.http_server.addRoute('GET', '/version', (req, res) => {
+            this.http_server.sendJson(res, {version});
         });
 
         // start
-        this.httpServer.start();
-        this.webSocketServer.start();
-        this.tcpServer.start();
-        this.udpServer.start();
+        this.http_server.start();
+        this.websocket_server_a = new NodeServer.WebSocketServer({http_server: this.http_server});
+        this.websocket_server_a.start();
+        this.websocket_server_b.start();
+        this.tcp_server.start();
+        this.udp_server.start();
 
         return this;
     }

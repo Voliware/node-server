@@ -13,18 +13,28 @@ class WebSocketServer extends Server {
      * @param {Object} [options={}]
      * @param {String} [options.host="localhost"]
      * @param {Number} [options.port=2222]
+     * @param {HttpServer} [options.http_server=null]
      * @return {WebSocketServer}
      */
     constructor({
         host = "localhost",
-        port = 2222
+        port = 2222,
+        http_server = null
     })
     {
         super({host, port});
-        this.server_listener = new WebSocketServerListener({
-            host: this.host,
-            port: this.port
-        });
+
+        // Use the passed HTTP server's listener
+        if(http_server){
+            this.server_listener = new WebSocketServerListener({http_server});
+        }
+        // Or create one
+        else {
+            this.server_listener = new WebSocketServerListener({
+                host: this.host,
+                port: this.port
+            });
+        }
     }
 }
 
