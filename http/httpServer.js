@@ -18,16 +18,25 @@ class HttpServer extends Server {
      * Constructor
      * @param {Object} [options={}]
      * @param {String} [options.host="localhost"]
+     * @param {Number} [options.port=80]
+	 * @param {Boolean} [options.https=false]
      * @param {String} [options.public_path="public"]
      * @param {String} [options.public_index="index.html"]
+	 * @param {String} [options.certificate_path='sslcert/server.cert']
+	 * @param {String} [options.cert_bundle_path='sslcert/server.ca']
+	 * @param {String} [options.private_key_path='sslcert/server.key']
      * @return {HttpServer}
      */
     constructor({
         host = "localhost",
         port = 80,
+        https = false,
         router = Router(),
         public_path = Path.join(__dirname, '..', "public"),
-        public_index = "index.html"
+        public_index = "index.html",
+        certificate_path = "sslcert/server.cert",
+        cert_bundle_path = "sslcert/server.ca",
+        private_key_path = "sslcert/server.key"
     })
     {
         super({host, port, router});
@@ -61,6 +70,10 @@ class HttpServer extends Server {
          * @type {HttpServerListener}
          */
         this.server_listener = new HttpServerListener({
+            https,
+            certificate_path,
+            cert_bundle_path,
+            private_key_path,
             host: this.host,
             port: this.port
         });

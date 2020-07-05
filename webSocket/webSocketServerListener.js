@@ -52,7 +52,7 @@ class WebSocketServerListener extends HttpServerListener {
 	listen(){
         // Already have an HTTP server set
         if(this.server){
-            this.logger.info(`Binding to HTTP server started on ${this.server.host} on port ${this.server.port}`);
+            this.logger.info(`Binding to HTTP server started on ${this.host} on port ${this.port}`);
             this.web_socket_server = this.createWebSocketServer(this.server);
         }
         // Create an HTTP server
