@@ -1,10 +1,11 @@
+const Cookies = require('cookies');
 const Querystring = require('query-string');
-const Server = require('../server/server');
 const Fs = require('fs');
 const Path = require('path');
 const Mime = require('mime-types');
 const Router = require('find-my-way');
 const UserAgent = require('useragent');
+const Server = require('../server/server');
 const HttpServerListener = require('./httpServerListener');
 
 /**
@@ -151,6 +152,19 @@ class HttpServer extends Server {
      */
     getClientBrowser(request){
         return UserAgent.lookup(request.headers['user-agent']);
+    }
+
+    /**
+     * Get information about a client making the request.
+     * @param {ClientRequest} request 
+     * @param {ServerResponse} response 
+     * @returns {{ip: String, browser: Object, cookies: Object}} object with ip, browser, cookies
+     */
+    getClient(request, response){
+        let ip = this.getClientIp(request);
+        let browser = this.getClientBrowser(request);
+        let cookies = new Cookies(request, response);
+        return {ip, browser, cookies};
     }
 
     /**

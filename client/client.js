@@ -188,6 +188,14 @@ class Client extends EventEmitter {
     getSocketPort(){
         throw new Error("getSocketPort must be implemented")
     }
+
+    /**
+     * Get the client's ID
+     * @returns {String}
+     */
+    getId(){
+        return this.id;
+    }
     
     /**
      * Set the client's id
@@ -195,6 +203,14 @@ class Client extends EventEmitter {
      */
     setId(id){
         this.id = id;
+    }
+
+    /**
+     * Get the client's name
+     * @returns {String}
+     */
+    getName(){
+        return this.name;
     }
 
     /**
